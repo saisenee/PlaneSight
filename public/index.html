@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlaneSight</title>
+    
+    <meta
+      name="description"
+      content="Live Toronto Pearson Airport flight dashboard using AviationStack."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="dm-sans-body">
+    <main class="page-shell">
+      <section class="panel hero">
+        <div>
+          <span class="eyebrow">Live Airport Feed Starter</span>
+          <h1>Toronto Pearson International Airport · YYZ</h1>
+          <p>
+            This version uses plain HTML, CSS, and JavaScript on the frontend, with a
+            small Node.js API for AviationStack.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button id="refreshButton" class="button" type="button">Refresh now</button>
+          <p id="lastUpdatedText">Waiting for first refresh</p>
+        </div>
+      </section>
+
+      <section class="status-grid">
+        <article class="status-card">
+          <span class="status-card-label">Arrivals</span>
+          <strong id="arrivalsCount" class="status-card-value">0</strong>
+          <p class="status-card-detail">Flights currently inbound to YYZ</p>
+        </article>
+        <article class="status-card">
+          <span class="status-card-label">Departures</span>
+          <strong id="departuresCount" class="status-card-value">0</strong>
+          <p class="status-card-detail">Flights currently outbound from YYZ</p>
+        </article>
+        <article class="status-card">
+          <span class="status-card-label">Live Flights</span>
+          <strong id="liveCount" class="status-card-value">0</strong>
+          <p class="status-card-detail">Flights marked live by AviationStack</p>
+        </article>
+      </section>
+
+      <section id="noticePanel" class="panel notice-panel hidden">
+        <h2>Setup notice</h2>
+        <p id="noticeText"></p>
+        <p>
+          Add <code>AVIATIONSTACK_API_KEY</code> in <code>.env.local</code> for live
+          data. Optional MongoDB placeholders remain for future use.
+        </p>
+      </section>
+
+      <section class="panel chart-placeholder">
+        <div class="panel-header">
+          <div>
+            <h2>Visualization placeholder</h2>
+            <p>Add your first Chart.js chart here when you are ready.</p>
+          </div>
+          <span class="panel-pill">Next step</span>
+        </div>
+        <div class="chart-canvas-placeholder">
+          <span>Chart.js is installed in the project.</span>
+          <strong>Suggested first chart: arrivals vs departures over time.</strong>
+        </div>
+      </section>
+
+      <section class="table-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Arrivals to YYZ</h2>
+              <p>Latest inbound flights returned by AviationStack.</p>
+            </div>
+            <span id="arrivalsPill" class="panel-pill">0 flights</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="flight-table">
+              <thead>
+                <tr>
+                  <th>Flight</th>
+                  <th>Airline</th>
+                  <th>Route</th>
+                  <th>Scheduled</th>
+                  <th>Actual / Est.</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="arrivalsTableBody">
+                <tr>
+                  <td colspan="6" class="empty-cell">No arrival data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Departures from YYZ</h2>
+              <p>Latest outbound flights returned by AviationStack.</p>
+            </div>
+            <span id="departuresPill" class="panel-pill">0 flights</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="flight-table">
+              <thead>
+                <tr>
+                  <th>Flight</th>
+                  <th>Airline</th>
+                  <th>Route</th>
+                  <th>Scheduled</th>
+                  <th>Actual / Est.</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="departuresTableBody">
+                <tr>
+                  <td colspan="6" class="empty-cell">No departure data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

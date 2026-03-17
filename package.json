@@ -1,0 +1,30 @@
+{
+  "name": "planesight",
+  "version": "1.0.0",
+  "description": "Discover a live, dynamically updating data visualization of flight data at Toronto's Pearson Airport. (Sourced by AviationStack API: https://aviationstack.com/ )",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node -e \"console.log('Static frontend: no build step required.')\"",
+    "start": "node server.js",
+    "lint": "eslint ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saisenee/PlaneSight.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/saisenee/PlaneSight/issues"
+  },
+  "homepage": "https://github.com/saisenee/PlaneSight#readme",
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.4"
+  }
+}
