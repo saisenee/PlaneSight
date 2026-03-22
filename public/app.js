@@ -1810,6 +1810,7 @@ function renderFlights(tableBody, flights, emptyMessage) {
           : escapeHtml(flight.airline);
         const normalizedStatus = (flight.status || "").toLowerCase();
         const statusClass = [
+          normalizedStatus,
           flight.isLive ? "live" : "",
           normalizedStatus === "active" ? "active" : "",
         ]
