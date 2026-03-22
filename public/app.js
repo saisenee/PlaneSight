@@ -1840,6 +1840,10 @@ function renderFlights(tableBody, flights, emptyMessage) {
 }
 
 function showNotice(message) {
+  if (!elements.noticePanel || !elements.noticeText) {
+    return;
+  }
+
   if (!message) {
     elements.noticePanel.classList.add("hidden");
     elements.noticeText.textContent = "";
