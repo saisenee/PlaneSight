@@ -19,7 +19,7 @@ function getConfig() {
   };
 }
 
-function placeholderResponse(type, message) {
+function placeholderResponse(type, message) {   
   return {
     airportCode: airportConfig.code,
     airportName: airportConfig.name,
@@ -238,6 +238,8 @@ function normalizeFlights(flights, type, airportLookup) {
     return {
       id: fallbackId,
       airline: (flight.airline && flight.airline.name) || "Unknown airline",
+      airlineIata: normalizeCode(flight && flight.airline && flight.airline.iata) || null,
+      airlineIcao: normalizeCode(flight && flight.airline && flight.airline.icao) || null,
       flightNumber: (flight.flight && flight.flight.number) || "—",
       flightIata:
         (flight.flight && (flight.flight.iata || flight.flight.icao)) || "—",
@@ -321,7 +323,17 @@ async function loadFlights(type, query) {
   }
 
   const airportLookup = await buildAirportLookup(payload.data || []);
-  return normalizeFlights(payload.data, type, airportLookup);
+  const flights = normalizeFlights(payload.data, type, airportLookup);
+  const pagination = payload.pagination || {};
+  const totalAvailable = Number.isFinite(Number(pagination.total))
+    ? Number(pagination.total)
+    : flights.length;
+
+  return {
+    flights,
+    totalAvailable,
+    fetchedCount: flights.length,
+  };
 }
 
 function getCachedPayload(type) {
@@ -338,6 +350,10 @@ function getCachedPayload(type) {
     airportName: airportConfig.name,
     type,
     count: cached.flights.length,
+    fetchedCount: cached.flights.length,
+    totalAvailable: Number.isFinite(cached.totalAvailable)
+      ? cached.totalAvailable
+      : cached.flights.length,
     lastUpdated: new Date(cached.updatedAt).toISOString(),
     source: "aviationstack",
     placeholder: true,
@@ -382,10 +398,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const flights = await loadFlights(type, req.query);
+    const result = await loadFlights(type, req.query);
+    const flights = result.flights;
 
     flightsCache[type] = {
       flights,
+      totalAvailable: result.totalAvailable,
       updatedAt: Date.now(),
     };
 
@@ -394,6 +412,8 @@ module.exports = async function handler(req, res) {
       airportName: airportConfig.name,
       type,
       count: flights.length,
+      fetchedCount: result.fetchedCount,
+      totalAvailable: result.totalAvailable,
       lastUpdated: new Date().toISOString(),
       source: "aviationstack",
       placeholder: false,

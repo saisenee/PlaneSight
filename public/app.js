@@ -71,14 +71,86 @@ const airportCoordinateByIata = {
   SEA: { lat: 47.4502, lon: -122.3088 },
 };
 
+const airportCountryByIata = {
+  YYZ: "CA",
+  YUL: "CA",
+  YOW: "CA",
+  YWG: "CA",
+  YYC: "CA",
+  YEG: "CA",
+  YHZ: "CA",
+  YQB: "CA",
+  YQT: "CA",
+  JFK: "US",
+  EWR: "US",
+  PHL: "US",
+  ATL: "US",
+  ORD: "US",
+  IAD: "US",
+  RDU: "US",
+  MIA: "US",
+  MCO: "US",
+  LAS: "US",
+  LAX: "US",
+  SFO: "US",
+  SEA: "US",
+  AMS: "NL",
+  LHR: "GB",
+  LIS: "PT",
+  IST: "TR",
+  DEL: "IN",
+  ICN: "KR",
+  AUH: "AE",
+  DXB: "AE",
+  CAI: "EG",
+  GIG: "BR",
+  PUJ: "DO",
+  PDL: "PT",
+  CDG: "FR",
+  FRA: "DE",
+  MUC: "DE",
+  MAD: "ES",
+  BCN: "ES",
+  FCO: "IT",
+  CPH: "DK",
+  ARN: "SE",
+  OSL: "NO",
+  HEL: "FI",
+  ZRH: "CH",
+  VIE: "AT",
+  BRU: "BE",
+  DUB: "IE",
+  DOH: "QA",
+  HND: "JP",
+  NRT: "JP",
+  HKG: "HK",
+  SIN: "SG",
+  SYD: "AU",
+  AKL: "NZ",
+  MEX: "MX",
+};
+
 let topRoutesChart;
 let hourlyClockChart;
+let domesticMixChart;
 let selectedFlightId = null;
 let latestFlights = [];
 let pollingIntervalId = null;
 let latestArrivals = [];
 let latestDepartures = [];
+let latestArrivalTotal = 0;
+let latestDepartureTotal = 0;
 let isRefreshing = false;
+let constellationMap = null;
+let constellationHost = null;
+let routeLayerGroup = null;
+let markerLayerGroup = null;
+let mapTileLayer = null;
+let hasLeafletViewportSet = false;
+const flightMarkersById = new Map();
+let mapTheme = window.localStorage.getItem("planesight-map-theme") === "light"
+  ? "light"
+  : "dark";
 
 const elements = {
   refreshButton: document.getElementById("refreshButton"),
@@ -94,6 +166,7 @@ const elements = {
   noticeText: document.getElementById("noticeText"),
   topRoutesChart: document.getElementById("topRoutesChart"),
   hourlyClockChart: document.getElementById("hourlyClockChart"),
+  domesticMixChart: document.getElementById("domesticMixChart"),
   flightConstellation: document.getElementById("flightConstellation"),
   flightTooltip: document.getElementById("flightTooltip"),
   selectedFlightPanel: document.getElementById("selectedFlightPanel"),
@@ -103,6 +176,7 @@ const elements = {
   filterLimit: document.getElementById("filterLimit"),
   clearFiltersButton: document.getElementById("clearFiltersButton"),
   activeFilterChips: document.getElementById("activeFilterChips"),
+  mapThemeToggle: document.getElementById("mapThemeToggle"),
 };
 
 // Hero scroll animation
@@ -194,6 +268,135 @@ function initHeroScrollAnimation() {
   }
 
   updatePlanePosition();
+}
+
+function initRevealSectionsAndNavWheel() {
+  const revealSections = Array.from(document.querySelectorAll(".reveal-section"));
+  const navItems = Array.from(document.querySelectorAll(".side-nav-item"));
+  const pageProgressFill = document.getElementById("pageProgressFill");
+  const pageProgressPlane = document.getElementById("pageProgressPlane");
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (revealSections.length) {
+    if (prefersReducedMotion || !("IntersectionObserver" in window)) {
+      revealSections.forEach((section) => section.classList.add("in-view"));
+    } else {
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in-view");
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          threshold: 0.02,
+          rootMargin: "0px 0px -6% 0px",
+        },
+      );
+
+      revealSections.forEach((section) => revealObserver.observe(section));
+    }
+  }
+
+  if (!navItems.length) {
+    return;
+  }
+
+  const sectionElements = navItems
+    .map((item) => document.getElementById(item.dataset.target || ""))
+    .filter(Boolean);
+
+  if (!sectionElements.length) {
+    return;
+  }
+
+  function setActiveIndex(index, { scroll = false } = {}) {
+    const clampedIndex = Math.max(0, Math.min(sectionElements.length - 1, index));
+
+    navItems.forEach((item, itemIndex) => {
+      item.classList.toggle("active", itemIndex === clampedIndex);
+    });
+
+    if (scroll) {
+      sectionElements[clampedIndex].scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    }
+  }
+
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const itemIndex = navItems.indexOf(item);
+      if (itemIndex < 0) {
+        return;
+      }
+
+      setActiveIndex(itemIndex, { scroll: true });
+    });
+  });
+
+  let ticking = false;
+
+  function updateNavWheelState() {
+    const anchorY = window.innerHeight * 0.38;
+    let bestIndex = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    sectionElements.forEach((section, index) => {
+      const rect = section.getBoundingClientRect();
+      const inAnchorBand = rect.top <= anchorY && rect.bottom >= anchorY;
+      const score = inAnchorBand ? 0 : Math.abs(rect.top - anchorY);
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+
+    setActiveIndex(bestIndex, { scroll: false });
+  }
+
+  function updatePageProgress() {
+    if (!pageProgressFill && !pageProgressPlane) {
+      return;
+    }
+
+    const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const scrollMax = Math.max(
+      1,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+    const progress = Math.max(0, Math.min(1, scrollTop / scrollMax));
+
+    if (pageProgressFill) {
+      pageProgressFill.style.width = `${progress * 100}%`;
+    }
+
+    if (pageProgressPlane) {
+      pageProgressPlane.style.left = `${progress * 100}%`;
+    }
+  }
+
+  function onScrollOrResize() {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      updateNavWheelState();
+      updatePageProgress();
+      ticking = false;
+    });
+  }
+
+  window.addEventListener("scroll", onScrollOrResize, { passive: true });
+  window.addEventListener("resize", onScrollOrResize);
+  updateNavWheelState();
+  updatePageProgress();
 }
 
 function formatTime(value) {
@@ -409,6 +612,86 @@ function createOrUpdateHourlyClockChart(flights) {
   });
 }
 
+function createOrUpdateDomesticMixChart(flights) {
+  if (!elements.domesticMixChart || typeof Chart === "undefined") {
+    return;
+  }
+
+  let domestic = 0;
+  let international = 0;
+
+  for (const flight of flights) {
+    const peerCountry = flight.direction === "arrival"
+      ? airportCountryCode(flight.departureIata, flight.departureCountryCode)
+      : airportCountryCode(flight.arrivalIata, flight.arrivalCountryCode);
+
+    if (!peerCountry) {
+      continue;
+    }
+
+    if (peerCountry === "CA") {
+      domestic += 1;
+    } else {
+      international += 1;
+    }
+  }
+
+  const totalKnown = domestic + international;
+  const labels = ["Domestic (Canada)", "International"];
+  const values = totalKnown ? [domestic, international] : [1, 0];
+  const dataset = {
+    data: values,
+    backgroundColor: totalKnown
+      ? ["rgba(110, 231, 183, 0.82)", "rgba(86, 204, 242, 0.82)"]
+      : ["rgba(159, 179, 210, 0.34)", "rgba(86, 204, 242, 0.14)"],
+    borderColor: ["rgba(187, 245, 224, 0.95)", "rgba(170, 234, 255, 0.95)"],
+    borderWidth: 1,
+  };
+
+  const options = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          color: "#d0ddf0",
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label(context) {
+            if (!totalKnown) {
+              return "No country metadata available";
+            }
+
+            const value = context.parsed;
+            const pct = Math.round((value / totalKnown) * 100);
+            return `${context.label}: ${value} flights (${pct}%)`;
+          },
+        },
+      },
+    },
+    cutout: "58%",
+  };
+
+  if (domesticMixChart) {
+    domesticMixChart.data.labels = labels;
+    domesticMixChart.data.datasets[0].data = values;
+    domesticMixChart.data.datasets[0].backgroundColor = dataset.backgroundColor;
+    domesticMixChart.update();
+    return;
+  }
+
+  domesticMixChart = new Chart(elements.domesticMixChart, {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [dataset],
+    },
+    options,
+  });
+}
+
 function hashString(value) {
   let hash = 2166136261;
 
@@ -449,17 +732,26 @@ function isRenderableCoordinate(lat, lon) {
 }
 
 function projectCoordinate(lat, lon) {
+  // Full equirectangular projection for a pole-to-pole world map.
+  const minLon = -180;
+  const maxLon = 180;
+  const maxLat = 90;
+  const minLat = -90;
+
+  const clampedLon = Math.max(minLon, Math.min(maxLon, lon));
+  const clampedLat = Math.max(minLat, Math.min(maxLat, lat));
+
   return {
-    x: ((lon + 180) / 360) * 100,
-    y: ((90 - lat) / 180) * 100,
+    x: ((clampedLon - minLon) / (maxLon - minLon)) * 100,
+    y: ((maxLat - clampedLat) / (maxLat - minLat)) * 100,
   };
 }
 
-const worldLowAspectRatio = 959.22 / 500;
+const worldMapAspectRatio = 2;
 
 function mapCoordinateToContainer(point, width, height) {
-  const mapWidth = Math.min(width, height * worldLowAspectRatio);
-  const mapHeight = mapWidth / worldLowAspectRatio;
+  const mapWidth = Math.min(width, height * worldMapAspectRatio);
+  const mapHeight = mapWidth / worldMapAspectRatio;
   const offsetX = (width - mapWidth) / 2;
   const offsetY = (height - mapHeight) / 2;
 
@@ -478,6 +770,306 @@ function knownAirportCoordinate(iata) {
   return airportCoordinateByIata[code] || null;
 }
 
+function airportCountryCode(iata, countryCode) {
+  const explicitCode = normalizeCountryCode(countryCode);
+
+  if (explicitCode) {
+    return explicitCode;
+  }
+
+  if (!iata || typeof iata !== "string") {
+    return null;
+  }
+
+  return airportCountryByIata[iata.trim().toUpperCase()] || null;
+}
+
+function normalizeCountryCode(code) {
+  if (!code || typeof code !== "string") {
+    return null;
+  }
+
+  const normalized = code.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
+
+function airportFlag(iata, countryCode) {
+  return countryCodeToFlag(airportCountryCode(iata, countryCode));
+}
+
+function flagEmojiHtml(iata, countryCode) {
+  const flag = airportFlag(iata, countryCode);
+  return `<span class="flag-emoji" aria-hidden="true">${escapeHtml(flag)}</span>`;
+}
+
+const airlineLogoCatalogueByCode = {
+  AC: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Air_Canada_Logo.svg/200px-Air_Canada_Logo.svg.png",
+  WS: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/WestJet_Logo.svg/200px-WestJet_Logo.svg.png",
+  BA: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/British_Airways_Logo.svg/200px-British_Airways_Logo.svg.png",
+  LH: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Lufthansa_Logo_2018.svg/200px-Lufthansa_Logo_2018.svg.png",
+  AF: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Air_France_Logo.svg/200px-Air_France_Logo.svg.png",
+  KL: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/KLM_logo.svg/200px-KLM_logo.svg.png",
+  EK: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Emirates_logo.svg/200px-Emirates_logo.svg.png",
+  DL: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Delta_Air_Lines_Logo.svg/200px-Delta_Air_Lines_Logo.svg.png",
+  UA: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/United_Airlines_Logo.svg/200px-United_Airlines_Logo.svg.png",
+  AA: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/American_Airlines_logo_2013.svg/200px-American_Airlines_logo_2013.svg.png",
+  KE: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Korean_Air_Logo.svg/200px-Korean_Air_Logo.svg.png",
+  TS: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Air_Transat_logo.svg/200px-Air_Transat_logo.svg.png",
+  PD: "https://upload.wikimedia.org/wikipedia/en/thumb/2/2c/Porter_Airlines_Logo.svg/200px-Porter_Airlines_Logo.svg.png",
+  F8: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Flair_Airlines_Logo.svg/200px-Flair_Airlines_Logo.svg.png",
+  WG: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Sunwing_Airlines_Logo.svg/200px-Sunwing_Airlines_Logo.svg.png",
+  TK: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Turkish_Airlines_logo_2019_compact.svg/200px-Turkish_Airlines_logo_2019_compact.svg.png",
+  QR: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Qatar_Airways_Logo.svg/200px-Qatar_Airways_Logo.svg.png",
+  ET: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Ethiopian_Airlines_Logo.svg/200px-Ethiopian_Airlines_Logo.svg.png",
+  NH: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/All_Nippon_Airways_logo.svg/200px-All_Nippon_Airways_logo.svg.png",
+  JL: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Japan_Airlines_logo.svg/200px-Japan_Airlines_logo.svg.png",
+  CX: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Cathay_Pacific_Logo.svg/200px-Cathay_Pacific_Logo.svg.png",
+  SQ: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Singapore_Airlines_Logo_2.svg/200px-Singapore_Airlines_Logo_2.svg.png",
+  AZ: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/ITA_Airways_logo.svg/200px-ITA_Airways_logo.svg.png",
+  EI: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Aer_Lingus_Logo_2019.svg/200px-Aer_Lingus_Logo_2019.svg.png",
+};
+
+const airlineNameToCode = {
+  "air canada": "AC",
+  westjet: "WS",
+  "american airlines": "AA",
+  "delta air lines": "DL",
+  "united airlines": "UA",
+  "british airways": "BA",
+  lufthansa: "LH",
+  "air france": "AF",
+  klm: "KL",
+  emirates: "EK",
+  "korean air": "KE",
+  egyptair: "MS",
+  "egypt air": "MS",
+  "latam airlines": "LA",
+  latam: "LA",
+  "china southern airlines": "CZ",
+  "china southern": "CZ",
+  "china eastern airlines": "MU",
+  "china eastern": "MU",
+  "air china": "CA",
+  "hainan airlines": "HU",
+  "ana all nippon airways": "NH",
+  "all nippon airways": "NH",
+  "kenya airways": "KQ",
+  qantas: "QF",
+  "qantas airways": "QF",
+  "tap air portugal": "TP",
+  tap: "TP",
+  avianca: "AV",
+  "sa avianca": "AV",
+  austrian: "OS",
+  "austrian airlines": "OS",
+  sas: "SK",
+  "sas scandinavian airlines": "SK",
+  "scandinavian airlines": "SK",
+  condor: "DE",
+  "condor airlines": "DE",
+  aeromexico: "AM",
+  "aero mexico": "AM",
+  "caribbean airlines": "BW",
+  "carribean airlines": "BW",
+  "etihad airways": "EY",
+  "virgin atlantic": "VS",
+  "virigin atlantic": "VS",
+  "el al": "LY",
+  "el al israel airlines": "LY",
+  "ei ai": "LY",
+};
+
+const airlineIataToIcao = {
+  AC: "ACA",
+  WS: "WJA",
+  AA: "AAL",
+  DL: "DAL",
+  UA: "UAL",
+  BA: "BAW",
+  LH: "DLH",
+  AF: "AFR",
+  KL: "KLM",
+  EK: "UAE",
+  KE: "KAL",
+  TS: "TSC",
+  PD: "POE",
+  F8: "FLE",
+  WG: "SWG",
+  TK: "THY",
+  QR: "QTR",
+  ET: "ETH",
+  NH: "ANA",
+  JL: "JAL",
+  CX: "CPA",
+  SQ: "SIA",
+  EI: "EIN",
+  MS: "MSR",
+  LA: "LAN",
+  JJ: "TAM",
+  CZ: "CSN",
+  MU: "CES",
+  CA: "CCA",
+  HU: "CHH",
+  KQ: "KQA",
+  QF: "QFA",
+  TP: "TAP",
+  AV: "AVA",
+  OS: "AUA",
+  SK: "SAS",
+  DE: "CFG",
+  AM: "AMX",
+  BW: "BWA",
+  EY: "ETD",
+  VS: "VIR",
+  LY: "ELY",
+};
+
+function normalizeAirlineName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function inferredAirlineCodes(flight) {
+  const iataCodes = new Set();
+  const icaoCodes = new Set();
+
+  const explicitIata = String(flight && flight.airlineIata ? flight.airlineIata : "")
+    .trim()
+    .toUpperCase();
+  const explicitIcao = String(flight && flight.airlineIcao ? flight.airlineIcao : "")
+    .trim()
+    .toUpperCase();
+
+  if (/^[A-Z0-9]{2}$/.test(explicitIata)) {
+    iataCodes.add(explicitIata);
+  }
+
+  if (/^[A-Z0-9]{3}$/.test(explicitIcao)) {
+    icaoCodes.add(explicitIcao);
+  }
+
+  const fromFlightIata = String(flight && flight.flightIata ? flight.flightIata : "")
+    .trim()
+    .toUpperCase();
+
+  if (/^[A-Z0-9]{2,3}/.test(fromFlightIata)) {
+    const prefix2 = fromFlightIata.slice(0, 2);
+    const prefix3 = fromFlightIata.slice(0, 3);
+
+    if (/^[A-Z0-9]{2}$/.test(prefix2)) {
+      iataCodes.add(prefix2);
+    }
+
+    if (/^[A-Z0-9]{3}$/.test(prefix3)) {
+      icaoCodes.add(prefix3);
+    }
+  }
+
+  const airlineName = normalizeAirlineName(flight && flight.airline ? flight.airline : "");
+  if (airlineName && airlineNameToCode[airlineName]) {
+    iataCodes.add(airlineNameToCode[airlineName]);
+  }
+
+  return [...iataCodes, ...icaoCodes];
+}
+
+function logopediaLogoCandidates(flight, codes) {
+  const airlineName = String(flight && flight.airline ? flight.airline : "").trim();
+
+  if (!airlineName) {
+    return [];
+  }
+
+  const normalizedName = airlineName
+    .replaceAll("&", "and")
+    .replace(/[^A-Za-z0-9\s-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalizedName) {
+    return [];
+  }
+
+  const title = normalizedName.replace(/\s+/g, "_");
+  const candidates = [
+    `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_logo.svg`,
+    `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_logo.png`,
+    `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_Logo.svg`,
+    `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_Logo.png`,
+  ];
+
+  for (const code of codes) {
+    candidates.push(
+      `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_${encodeURIComponent(code)}_logo.svg`,
+    );
+    candidates.push(
+      `https://logos.fandom.com/wiki/Special:FilePath/${encodeURIComponent(title)}_${encodeURIComponent(code)}_logo.png`,
+    );
+  }
+
+  return candidates;
+}
+
+function airlineLogoCandidates(flight) {
+  const codes = inferredAirlineCodes(flight);
+
+  const icaoCodes = new Set(
+    codes.filter((code) => /^[A-Z0-9]{3}$/.test(code)),
+  );
+
+  for (const iataCode of codes.filter((code) => /^[A-Z0-9]{2}$/.test(code))) {
+    if (airlineIataToIcao[iataCode]) {
+      icaoCodes.add(airlineIataToIcao[iataCode]);
+    }
+  }
+
+  const repoCandidates = [...icaoCodes].flatMap((icaoCode) => [
+    `https://cdn.jsdelivr.net/gh/sexym0nk3y/airline-logos@main/logos/${encodeURIComponent(icaoCode)}.png`,
+    `https://raw.githubusercontent.com/sexym0nk3y/airline-logos/main/logos/${encodeURIComponent(icaoCode)}.png`,
+  ]);
+
+  const logopediaCandidates = logopediaLogoCandidates(flight, codes);
+
+  const candidates = [];
+
+  candidates.push(...repoCandidates);
+
+  candidates.push(...logopediaCandidates);
+
+  for (const code of codes) {
+    if (airlineLogoCatalogueByCode[code]) {
+      candidates.push(airlineLogoCatalogueByCode[code]);
+    }
+  }
+
+  return [...new Set(candidates)].filter(Boolean);
+}
+
+if (typeof window !== "undefined" && !window.handleAirlineLogoError) {
+  window.handleAirlineLogoError = (img) => {
+    const queue = (img.dataset.fallbackSrc || "")
+      .split("|")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!queue.length) {
+      img.style.display = "none";
+      return;
+    }
+
+    const [next, ...rest] = queue;
+    img.dataset.fallbackSrc = rest.join("|");
+    img.src = next;
+  };
+}
+
+function airlineLogoUrl(flight) {
+  const candidates = airlineLogoCandidates(flight);
+  return candidates.length ? candidates[0] : null;
+}
+
 function statusLabel(status, isLive) {
   if (isLive) {
     return "live";
@@ -487,8 +1079,8 @@ function statusLabel(status, isLive) {
 }
 
 function describeRoute(flight) {
-  const depFlag = countryCodeToFlag(flight.departureCountryCode);
-  const arrFlag = countryCodeToFlag(flight.arrivalCountryCode);
+  const depFlag = airportFlag(flight.departureIata, flight.departureCountryCode);
+  const arrFlag = airportFlag(flight.arrivalIata, flight.arrivalCountryCode);
   const depCode = flight.departureIata || "—";
   const arrCode = flight.arrivalIata || "—";
 
@@ -612,10 +1204,13 @@ function updateFilteredView() {
   const arrivalsFiltered = filteredArrivalFlights();
   const departuresFiltered = filteredDepartureFlights();
 
-  elements.arrivalsCount.textContent = String(arrivalsFiltered.length);
-  elements.departuresCount.textContent = String(departuresFiltered.length);
-  elements.arrivalsPill.textContent = `${arrivalsFiltered.length} flights`;
-  elements.departuresPill.textContent = `${departuresFiltered.length} flights`;
+  const arrivalTotalDisplay = latestArrivalTotal || latestArrivals.length;
+  const departureTotalDisplay = latestDepartureTotal || latestDepartures.length;
+
+  elements.arrivalsCount.textContent = String(arrivalTotalDisplay);
+  elements.departuresCount.textContent = String(departureTotalDisplay);
+  elements.arrivalsPill.textContent = `${arrivalsFiltered.length} shown · ${arrivalTotalDisplay} total`;
+  elements.departuresPill.textContent = `${departuresFiltered.length} shown · ${departureTotalDisplay} total`;
   elements.liveCount.textContent = String(filteredAll.filter((flight) => flight.isLive).length);
 
   renderFlights(
@@ -631,6 +1226,7 @@ function updateFilteredView() {
 
   createOrUpdateTopRoutesChart(filteredAll);
   createOrUpdateHourlyClockChart(filteredAll);
+  createOrUpdateDomesticMixChart(filteredAll);
 
   if (!selectedFlightId || !filteredAll.some((flight) => flight.id === selectedFlightId)) {
     selectedFlightId = filteredAll.length ? filteredAll[0].id : null;
@@ -654,8 +1250,8 @@ function renderSelectedFlightPanel(flight) {
     return;
   }
 
-  const depFlag = countryCodeToFlag(flight.departureCountryCode);
-  const arrFlag = countryCodeToFlag(flight.arrivalCountryCode);
+  const depFlag = airportFlag(flight.departureIata, flight.departureCountryCode);
+  const arrFlag = airportFlag(flight.arrivalIata, flight.arrivalCountryCode);
 
   elements.selectedFlightPanel.innerHTML = `
     <h4>Selected flight · ${escapeHtml(flight.flightIata)}</h4>
@@ -677,6 +1273,20 @@ function highlightFlightRows(flightId) {
 }
 
 function highlightMapPoints(flightId) {
+  if (flightMarkersById.size) {
+    for (const [id, marker] of flightMarkersById.entries()) {
+      const selected = id === flightId;
+      marker.setStyle({
+        radius: selected ? 7.5 : 5,
+        weight: selected ? 2.6 : 1.4,
+        opacity: selected ? 1 : 0.9,
+        fillOpacity: selected ? 1 : 0.86,
+      });
+    }
+
+    return;
+  }
+
   if (!elements.flightConstellation) {
     return;
   }
@@ -728,7 +1338,266 @@ function hideFlightTooltip() {
   elements.flightTooltip.classList.add("hidden");
 }
 
+function mapTileConfig(theme) {
+  if (theme === "light") {
+    return {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: "&copy; OpenStreetMap contributors",
+    };
+  }
+
+  return {
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+  };
+}
+
+function syncMapThemeToggleUi() {
+  if (!elements.mapThemeToggle) {
+    return;
+  }
+
+  const isDark = mapTheme === "dark";
+  elements.mapThemeToggle.textContent = isDark ? "🌙 Dark" : "☀️ Light";
+  elements.mapThemeToggle.setAttribute("aria-pressed", String(isDark));
+}
+
+function applyLeafletMapTheme() {
+  if (!window.L || !constellationMap) {
+    return;
+  }
+
+  const config = mapTileConfig(mapTheme);
+
+  if (mapTileLayer) {
+    constellationMap.removeLayer(mapTileLayer);
+  }
+
+  mapTileLayer = window.L.tileLayer(config.url, {
+    minZoom: 1,
+    maxZoom: 6,
+    noWrap: false,
+    attribution: config.attribution,
+  }).addTo(constellationMap);
+
+  window.localStorage.setItem("planesight-map-theme", mapTheme);
+  syncMapThemeToggleUi();
+}
+
+function buildFlightLatLon(flight) {
+  const depRawLat = Number(flight.departureLat);
+  const depRawLon = Number(flight.departureLon);
+  const arrRawLat = Number(flight.arrivalLat);
+  const arrRawLon = Number(flight.arrivalLon);
+
+  const depKnown = knownAirportCoordinate(flight.departureIata);
+  const arrKnown = knownAirportCoordinate(flight.arrivalIata);
+
+  const depLat = isRenderableCoordinate(depRawLat, depRawLon)
+    ? depRawLat
+    : depKnown
+      ? depKnown.lat
+      : Number.NaN;
+  const depLon = isRenderableCoordinate(depRawLat, depRawLon)
+    ? depRawLon
+    : depKnown
+      ? depKnown.lon
+      : Number.NaN;
+  const arrLat = isRenderableCoordinate(arrRawLat, arrRawLon)
+    ? arrRawLat
+    : arrKnown
+      ? arrKnown.lat
+      : Number.NaN;
+  const arrLon = isRenderableCoordinate(arrRawLat, arrRawLon)
+    ? arrRawLon
+    : arrKnown
+      ? arrKnown.lon
+      : Number.NaN;
+
+  return {
+    departure: isValidCoordinate(depLat, depLon) ? [depLat, depLon] : null,
+    arrival: isValidCoordinate(arrLat, arrLon) ? [arrLat, arrLon] : null,
+  };
+}
+
+function markerLatLonForFlight(flight, coords) {
+  if (flight.direction === "arrival" && coords.departure) {
+    return coords.departure;
+  }
+
+  if (flight.direction === "departure" && coords.arrival) {
+    return coords.arrival;
+  }
+
+  if (coords.arrival) {
+    return coords.arrival;
+  }
+
+  if (coords.departure) {
+    return coords.departure;
+  }
+
+  return null;
+}
+
+function tooltipMarkup(flight) {
+  const depFlag = countryCodeToFlag(flight.departureCountryCode);
+  const arrFlag = countryCodeToFlag(flight.arrivalCountryCode);
+
+  return `
+    <strong>${escapeHtml(flight.flightIata)} · ${escapeHtml(flight.airline)}</strong>
+    <div><b>Route:</b> ${escapeHtml(`${depFlag} ${flight.departureIata || "—"} → ${arrFlag} ${flight.arrivalIata || "—"}`)}</div>
+    <div><b>Destination:</b> ${escapeHtml(flight.arrivalAirport || "Unknown")}</div>
+    <div><b>Plane ID:</b> ${escapeHtml(flight.aircraftId || flight.flightIata)}</div>
+    <div><b>Status:</b> ${escapeHtml(statusLabel(flight.status, flight.isLive))}</div>
+    <div><b>Scheduled:</b> ${escapeHtml(formatTime(flight.scheduledTime))}</div>
+  `;
+}
+
+function ensureLeafletConstellation(container) {
+  if (!window.L) {
+    return false;
+  }
+
+  if (constellationMap && constellationHost && container.contains(constellationHost)) {
+    return true;
+  }
+
+  container.querySelectorAll(".flight-point").forEach((node) => node.remove());
+  container.querySelectorAll(".route-layer").forEach((node) => node.remove());
+  hideFlightTooltip();
+
+  if (constellationMap) {
+    constellationMap.remove();
+    constellationMap = null;
+  }
+
+  let host = container.querySelector(".flight-map");
+
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "flight-map";
+    container.prepend(host);
+  }
+
+  constellationHost = host;
+
+  constellationMap = window.L.map(host, {
+    zoomControl: true,
+    attributionControl: true,
+    worldCopyJump: true,
+  });
+
+  applyLeafletMapTheme();
+
+  routeLayerGroup = window.L.layerGroup().addTo(constellationMap);
+  markerLayerGroup = window.L.layerGroup().addTo(constellationMap);
+  hasLeafletViewportSet = false;
+  flightMarkersById.clear();
+
+  constellationMap.setView([35, -20], 2);
+  return true;
+}
+
+function renderConstellationLeaflet(flights) {
+  const container = elements.flightConstellation;
+
+  if (!container || !ensureLeafletConstellation(container) || !constellationMap) {
+    return false;
+  }
+
+  routeLayerGroup.clearLayers();
+  markerLayerGroup.clearLayers();
+  flightMarkersById.clear();
+  container.querySelectorAll(".yyz-point").forEach((node) => node.remove());
+
+  const boundsPoints = [];
+  const yyzHub = knownAirportCoordinate("YYZ");
+
+  if (yyzHub) {
+    const yyzMarker = window.L.marker([yyzHub.lat, yyzHub.lon], {
+      icon: window.L.divIcon({
+        className: "yyz-hub-marker-wrap",
+        html: '<div class="yyz-hub-marker" aria-hidden="true">★</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      }),
+      zIndexOffset: 1400,
+    });
+
+    yyzMarker.bindTooltip("YYZ · Toronto Pearson", {
+      direction: "top",
+      opacity: 0.96,
+    });
+
+    yyzMarker.addTo(markerLayerGroup);
+    boundsPoints.push([yyzHub.lat, yyzHub.lon]);
+  }
+
+  for (const flight of flights) {
+    const coords = buildFlightLatLon(flight);
+    const color = getStatusColor((flight.status || "").toLowerCase());
+    const isArrival = flight.direction === "arrival";
+
+    if (coords.departure && coords.arrival) {
+      const route = window.L.polyline([coords.departure, coords.arrival], {
+        color,
+        weight: isArrival ? 1.9 : 2,
+        opacity: isArrival ? 0.64 : 0.76,
+        dashArray: isArrival ? "8 6" : undefined,
+      });
+      route.addTo(routeLayerGroup);
+      boundsPoints.push(coords.departure, coords.arrival);
+    }
+
+    const markerPoint = markerLatLonForFlight(flight, coords);
+
+    if (!markerPoint) {
+      continue;
+    }
+
+    const marker = window.L.circleMarker(markerPoint, {
+      radius: 5,
+      color: "rgba(255,255,255,0.95)",
+      weight: 1.4,
+      fillColor: color,
+      fillOpacity: 0.86,
+      opacity: 0.9,
+    });
+
+    marker.on("mouseover", () => marker.bindTooltip(tooltipMarkup(flight), {
+      direction: "top",
+      sticky: true,
+      opacity: 0.96,
+    }).openTooltip());
+    marker.on("click", () => selectFlightById(flight.id));
+    marker.addTo(markerLayerGroup);
+
+    flightMarkersById.set(flight.id, marker);
+    boundsPoints.push(markerPoint);
+  }
+
+  if (boundsPoints.length && !hasLeafletViewportSet) {
+    constellationMap.fitBounds(boundsPoints, {
+      padding: [24, 24],
+      maxZoom: 3,
+    });
+    hasLeafletViewportSet = true;
+  }
+
+  highlightMapPoints(selectedFlightId);
+  return true;
+}
+
 function renderConstellation(flights) {
+  if (renderConstellationLeaflet(flights)) {
+    return;
+  }
+
+  renderConstellationFallback(flights);
+}
+
+function renderConstellationFallback(flights) {
   const container = elements.flightConstellation;
 
   if (!container) {
@@ -737,6 +1606,7 @@ function renderConstellation(flights) {
 
   container.querySelectorAll(".flight-point").forEach((node) => node.remove());
   container.querySelectorAll(".route-layer").forEach((node) => node.remove());
+  container.querySelectorAll(".yyz-point").forEach((node) => node.remove());
   hideFlightTooltip();
 
   const width = container.clientWidth || 900;
@@ -748,8 +1618,22 @@ function renderConstellation(flights) {
   svg.setAttribute("preserveAspectRatio", "none");
   container.appendChild(svg);
 
-  const mapWidth = Math.min(width, height * worldLowAspectRatio);
-  const mapHeight = mapWidth / worldLowAspectRatio;
+  const yyzHub = knownAirportCoordinate("YYZ");
+
+  if (yyzHub) {
+    const yyzPoint = mapCoordinateToContainer(projectCoordinate(yyzHub.lat, yyzHub.lon), width, height);
+    const hub = document.createElement("div");
+    hub.className = "yyz-point";
+    hub.textContent = "★";
+    hub.style.left = `${yyzPoint.x}%`;
+    hub.style.top = `${yyzPoint.y}%`;
+    hub.setAttribute("aria-label", "YYZ Toronto Pearson hub");
+    hub.title = "YYZ · Toronto Pearson";
+    container.appendChild(hub);
+  }
+
+  const mapWidth = Math.min(width, height * worldMapAspectRatio);
+  const mapHeight = mapWidth / worldMapAspectRatio;
   const mapOffsetX = (width - mapWidth) / 2;
   const mapOffsetY = (height - mapHeight) / 2;
 
@@ -801,6 +1685,7 @@ function renderConstellation(flights) {
       const rawTo = projectCoordinate(arrLat, arrLon);
       const from = mapCoordinateToContainer(rawFrom, width, height);
       const to = mapCoordinateToContainer(rawTo, width, height);
+      const routeDirectionClass = flight.direction === "arrival" ? "arrival-route" : "departure-route";
 
       const deltaX = to.x - from.x;
       const deltaY = to.y - from.y;
@@ -812,13 +1697,13 @@ function renderConstellation(flights) {
       const pathData = `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`;
 
       const routeArc = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      routeArc.setAttribute("class", "route-arc");
+      routeArc.setAttribute("class", `route-arc ${routeDirectionClass}`);
       routeArc.setAttribute("d", pathData);
       routeArc.setAttribute("stroke", getStatusColor((flight.status || "").toLowerCase()));
       svg.appendChild(routeArc);
 
       const routeLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      routeLine.setAttribute("class", "route-line");
+      routeLine.setAttribute("class", `route-line ${routeDirectionClass}`);
       routeLine.setAttribute("x1", String(from.x));
       routeLine.setAttribute("y1", String(from.y));
       routeLine.setAttribute("x2", String(to.x));
@@ -911,18 +1796,39 @@ function renderFlights(tableBody, flights, emptyMessage) {
 
   tableBody.innerHTML = flights
     .map(
-      (flight) => `
+      (flight) => {
+        const depFlag = flagEmojiHtml(flight.departureIata, flight.departureCountryCode);
+        const arrFlag = flagEmojiHtml(flight.arrivalIata, flight.arrivalCountryCode);
+        const depCode = escapeHtml(flight.departureIata || "—");
+        const arrCode = escapeHtml(flight.arrivalIata || "—");
+        const routePrimary = `${depFlag} ${depCode} → ${arrFlag} ${arrCode}`;
+
+        const airlineLogo = airlineLogoUrl(flight);
+        const logoFallbacks = airlineLogoCandidates(flight).slice(1).join("|");
+        const airlineSecondary = airlineLogo
+          ? `<span class="airline-meta"><img class="airline-logo" src="${airlineLogo}" data-fallback-src="${escapeHtml(logoFallbacks)}" alt="" loading="lazy" decoding="async" onerror="window.handleAirlineLogoError && window.handleAirlineLogoError(this)" />${escapeHtml(flight.airline)}</span>`
+          : escapeHtml(flight.airline);
+        const normalizedStatus = (flight.status || "").toLowerCase();
+        const statusClass = [
+          flight.isLive ? "live" : "",
+          normalizedStatus === "active" ? "active" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        return `
         <tr class="flight-row ${flight.id === selectedFlightId ? "selected" : ""}" data-flight-id="${escapeHtml(flight.id)}">
-          <td>${createCell(`${countryCodeToFlag(flight.departureCountryCode)} ${flight.flightIata}`, flight.airline)}</td>
-          <td>${createCell(describeRoute(flight).primary, describeRoute(flight).secondary)}</td>
+          <td>${createCell(escapeHtml(flight.flightIata || "—"), airlineSecondary)}</td>
+          <td>${createCell(routePrimary, describeRoute(flight).secondary)}</td>
           <td>${createCell(formatTime(flight.scheduledTime), `Actual/Est: ${formatTime(flight.actualTime)}`)}</td>
           <td>
-            <span class="status-badge ${flight.isLive ? "live" : ""}">
+            <span class="status-badge ${statusClass}">
               ${flight.isLive ? "Live" : flight.status}
             </span>
           </td>
         </tr>
-      `,
+      `;
+      },
     )
     .join("");
 
@@ -988,6 +1894,14 @@ async function refreshFlights() {
       ...flight,
       direction: "departure",
     }));
+
+    latestArrivalTotal = Number.isFinite(Number(arrivals.totalAvailable))
+      ? Number(arrivals.totalAvailable)
+      : latestArrivals.length;
+    latestDepartureTotal = Number.isFinite(Number(departures.totalAvailable))
+      ? Number(departures.totalAvailable)
+      : latestDepartures.length;
+
     latestFlights = [...latestArrivals, ...latestDepartures];
 
     const message =
@@ -1073,9 +1987,19 @@ if (elements.clearFiltersButton) {
   });
 }
 
+if (elements.mapThemeToggle) {
+  syncMapThemeToggleUi();
+
+  elements.mapThemeToggle.addEventListener("click", () => {
+    mapTheme = mapTheme === "dark" ? "light" : "dark";
+    applyLeafletMapTheme();
+  });
+}
+
 refreshFlights();
 pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
 document.addEventListener("visibilitychange", refreshWhenVisible);
 
 // Initialize hero scroll animation
 initHeroScrollAnimation();
+initRevealSectionsAndNavWheel();

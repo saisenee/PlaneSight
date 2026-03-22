@@ -15,11 +15,22 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
       rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="dm-sans-body">
+    <div class="refresh-floating">
+      <button id="refreshButton" class="button" type="button">Refresh</button>
+      <p id="lastUpdatedText">Waiting for first refresh</p>
+    </div>
+
     <main class="page-shell">
-      <section class="landing" aria-label="PlaneSight landing page">
+      <section id="landingSection" class="landing reveal-section" aria-label="PlaneSight landing page">
         <div class="landing__content">
           <img class="landing__logo" src="img/logo.png" alt="PlaneSight logo" />
           <p class="landing__subtitle">an Airport Data Visualization Dashboard</p>
@@ -29,7 +40,7 @@
         </div>
       </section>
 
-      <section id="dashboardStart" class="hero-scroll-section">
+      <section id="dashboardStart" class="hero-scroll-section reveal-section">
         <div class="hero-scroll-container">
           <div class="hero-plane-track">
             <div class="hero-plane-wrapper" id="heroPlaneWrapper">
@@ -48,14 +59,10 @@
             <div class="hero-destination-content">
               <div class="hero-destination-copy">
                 <h1 id="pearsonTitle">Toronto Pearson<br />International Airport</h1>
-                <p>
-                  This version uses plain HTML, CSS, and JavaScript on the frontend, with a
-                  small Node.js API for AviationStack. Live flight data visualization for
-                  arrivals and departures.
+                <p>Toronto Pearson International Airport (YYZ) is Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.
                 </p>
                 <div class="hero-actions">
-                  <button id="refreshButton" class="button" type="button">Refresh now</button>
-                  <p id="lastUpdatedText">Waiting for first refresh</p>
+                  <a class="button button-ghost" href="https://www.torontopearson.com/en" target="_blank" rel="noopener noreferrer">Visit Site</a>
                 </div>
               </div>
 
@@ -71,16 +78,16 @@
         </div>
       </section>
 
-      <section class="status-grid">
+      <section id="statusSection" class="status-grid reveal-section">
         <article class="status-card">
           <span class="status-card-label">Arrivals</span>
           <strong id="arrivalsCount" class="status-card-value">0</strong>
-          <p class="status-card-detail">Flights currently inbound to YYZ</p>
+          <p class="status-card-detail">Total arrivals available for YYZ</p>
         </article>
         <article class="status-card">
           <span class="status-card-label">Departures</span>
           <strong id="departuresCount" class="status-card-value">0</strong>
-          <p class="status-card-detail">Flights currently outbound from YYZ</p>
+          <p class="status-card-detail">Total departures available for YYZ</p>
         </article>
         <article class="status-card">
           <span class="status-card-label">Live Flights</span>
@@ -89,71 +96,73 @@
         </article>
       </section>
 
-      <section id="noticePanel" class="panel notice-panel hidden">
+      <!-- <section id="noticePanel" class="panel notice-panel hidden reveal-section">
         <h2>Setup notice</h2>
         <p id="noticeText"></p>
         <p>
           Add <code>AVIATIONSTACK_API_KEY</code> in <code>.env.local</code> for live
           data. Optional MongoDB placeholders remain for future use.
         </p>
-      </section>
+      </section> -->
 
-      <section class="panel chart-placeholder">
-        <div class="panel-header">
-          <div>
-            <h2>Traffic visualizations</h2>
-            <p>Top routes, hourly clock view, and a live artistic flight map.</p>
+      <section id="visualsSection" class="reveal-section visuals-stack">
+        <section class="panel chart-placeholder visuals-intro">
+          <div class="panel-header">
+            <div>
+              <h2>Traffic visualizations</h2>
+              <p>Top routes, hourly clock view, and a live artistic flight map.</p>
+            </div>
+            <span class="panel-pill">Live visuals</span>
           </div>
-          <span class="panel-pill">Live visuals</span>
-        </div>
 
-        <section class="filter-bar" aria-label="Flight filters">
-          <label>
-            Status
-            <select id="filterStatus">
-              <option value="all">All</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="active">Active</option>
-              <option value="landed">Landed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="incident">Incident</option>
-              <option value="diverted">Diverted</option>
-              <option value="live">Live only</option>
-            </select>
-          </label>
+          <section class="filter-bar" aria-label="Flight filters">
+            <label>
+              Status
+              <select id="filterStatus">
+                <option value="all">All</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="active">Active</option>
+                <option value="landed">Landed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="incident">Incident</option>
+                <option value="diverted">Diverted</option>
+                <option value="live">Live only</option>
+              </select>
+            </label>
 
-          <label>
-            Direction
-            <select id="filterDirection">
-              <option value="all">Arrivals + Departures</option>
-              <option value="arrival">Arrivals only</option>
-              <option value="departure">Departures only</option>
-            </select>
-          </label>
+            <label>
+              Direction
+              <select id="filterDirection">
+                <option value="all">Arrivals + Departures</option>
+                <option value="arrival">Arrivals only</option>
+                <option value="departure">Departures only</option>
+              </select>
+            </label>
 
-          <label>
-            Airline
-            <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
-          </label>
+            <label>
+              Airline
+              <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
+            </label>
 
-          <label>
-            Max flights shown
-            <select id="filterLimit">
-              <option value="all">All</option>
-              <option value="100">100</option>
-              <option value="60">60</option>
-              <option value="40">40</option>
-              <option value="20">20</option>
-            </select>
-          </label>
+            <label>
+              Max flights shown
+              <select id="filterLimit">
+                <option value="all">All</option>
+                <option value="100">100</option>
+                <option value="60">60</option>
+                <option value="40">40</option>
+                <option value="20">20</option>
+              </select>
+            </label>
 
-          <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
+            <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
+          </section>
+
+          <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
         </section>
 
-        <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
-
-        <div class="viz-grid">
-          <section class="viz-card">
+        <div id="dataVisualizationsSection" class="viz-grid">
+          <section id="topRoutesSection" class="viz-card">
             <h3>Top Routes to/from YYZ</h3>
             <p>Most frequent origin/destination pairs from the current live feed.</p>
             <div class="chart-wrap">
@@ -161,34 +170,57 @@
             </div>
           </section>
 
-          <section class="viz-card">
+          <section id="hourlyClockSection" class="viz-card">
             <h3>24-Hour Flight Clock</h3>
             <p>Flight density by scheduled hour to show daily traffic wave patterns.</p>
             <div class="chart-wrap">
               <canvas id="hourlyClockChart" aria-label="24 hour clock chart" role="img"></canvas>
             </div>
           </section>
+
+          <section id="domesticMixSection" class="viz-card">
+            <h3>Domestic vs International</h3>
+            <p>Share of YYZ flights that are within Canada versus outside Canada.</p>
+            <div class="chart-wrap">
+              <canvas id="domesticMixChart" aria-label="Domestic versus international chart" role="img"></canvas>
+            </div>
+          </section>
         </div>
 
-        <section class="viz-card artistic-card">
+        <section id="constellationSection" class="viz-card artistic-card">
           <div class="art-header">
             <div>
-              <h3>Flight Constellation</h3>
+              <h3>Flight Map</h3>
               <p>
                 Each point is a flight, colored by status. Hover to inspect destination,
                 airline, plane ID, status, and schedule.
               </p>
             </div>
-            <div class="legend" aria-label="Status legend">
-              <span><i class="dot dot-scheduled"></i>Scheduled</span>
-              <span><i class="dot dot-active"></i>Active</span>
-              <span><i class="dot dot-landed"></i>Landed</span>
-              <span><i class="dot dot-cancelled"></i>Cancelled</span>
-              <span><i class="dot dot-other"></i>Other</span>
+            <div class="art-controls">
+              <div class="legend" aria-label="Status legend">
+                <span><i class="dot dot-scheduled"></i>Scheduled</span>
+                <span><i class="dot dot-active"></i>Active</span>
+                <span><i class="dot dot-landed"></i>Landed</span>
+                <span><i class="dot dot-cancelled"></i>Cancelled</span>
+                <span><i class="dot dot-other"></i>Other</span>
+              </div>
+              <div class="route-legend" aria-label="Route direction legend">
+                <span><i class="route-sample route-sample-arrival"></i>To YYZ (arrivals)</span>
+                <span><i class="route-sample route-sample-departure"></i>From YYZ (departures)</span>
+              </div>
             </div>
           </div>
 
           <div id="flightConstellation" class="flight-constellation" aria-live="polite">
+            <button
+              id="mapThemeToggle"
+              class="button button-ghost map-theme-toggle map-theme-toggle--overlay"
+              type="button"
+              aria-pressed="true"
+              aria-label="Toggle map theme"
+            >
+              🌙 Dark
+            </button>
             <div id="flightTooltip" class="flight-tooltip hidden"></div>
           </div>
 
@@ -199,8 +231,8 @@
         </section>
       </section>
 
-      <section class="table-grid">
-        <section class="panel">
+      <section id="boardsSection" class="table-grid reveal-section">
+        <section id="arrivalsSection" class="panel">
           <div class="panel-header">
             <div>
               <h2>Arrivals to YYZ</h2>
@@ -227,7 +259,7 @@
           </div>
         </section>
 
-        <section class="panel">
+        <section id="departuresSection" class="panel">
           <div class="panel-header">
             <div>
               <h2>Departures from YYZ</h2>
@@ -255,16 +287,38 @@
         </section>
       </section>
 
-      <footer class="footer">
+      <footer id="footerSection" class="footer reveal-section">
         <nav class="footer-links" aria-label="External links">
-          <a href="https://github.com/saisenee/PlaneSight" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <span class="footer-divider">·</span>
-          <a href="https://aviationstack.com/" target="_blank" rel="noopener noreferrer">AviationStack</a>
+          <a class="button button-ghost footer-link-button" href="https://github.com/saisenee/PlaneSight" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="button button-ghost footer-link-button" href="https://aviationstack.com/" target="_blank" rel="noopener noreferrer">AviationStack</a>
         </nav>
       </footer>
     </main>
 
+    <nav class="side-nav" aria-label="Section quick navigation">
+      <button class="side-nav-item" type="button" data-target="landingSection">Home</button>
+      <button class="side-nav-item" type="button" data-target="topRoutesSection">Top Routes</button>
+      <button class="side-nav-item" type="button" data-target="hourlyClockSection">24-Hour Clock</button>
+      <button class="side-nav-item" type="button" data-target="domesticMixSection">Domestic vs Intl</button>
+      <button class="side-nav-item" type="button" data-target="constellationSection">Flight Map</button>
+      <button class="side-nav-item" type="button" data-target="arrivalsSection">Arrivals</button>
+      <button class="side-nav-item" type="button" data-target="departuresSection">Departures</button>
+    </nav>
+
+    <div class="page-progress" aria-hidden="true">
+      <div class="page-progress-track">
+        <div id="pageProgressFill" class="page-progress-fill"></div>
+        <img id="pageProgressPlane" class="page-progress-plane" src="img/planeicon.png" alt="" />
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+      defer
+    ></script>
     <script src="/app.js" defer></script>
   </body>
 </html>
