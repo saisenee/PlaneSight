@@ -5,7 +5,7 @@ const express = require("express");
 
 const flightsHandler = require("./api/flights");
 
-dotenv.config({ path: path.join(__dirname, ".env.local") });
+dotenv.config({ path: path.join(__dirname, ".env.local"), override: true });
 dotenv.config();
 
 const app = express();

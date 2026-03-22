@@ -64,15 +64,102 @@
       <section class="panel chart-placeholder">
         <div class="panel-header">
           <div>
-            <h2>Visualization placeholder</h2>
-            <p>Add your first Chart.js chart here when you are ready.</p>
+            <h2>Traffic visualizations</h2>
+            <p>Top routes, hourly clock view, and a live artistic flight map.</p>
           </div>
-          <span class="panel-pill">Next step</span>
+          <span class="panel-pill">Live visuals</span>
         </div>
-        <div class="chart-canvas-placeholder">
-          <span>Chart.js is installed in the project.</span>
-          <strong>Suggested first chart: arrivals vs departures over time.</strong>
+
+        <section class="filter-bar" aria-label="Flight filters">
+          <label>
+            Status
+            <select id="filterStatus">
+              <option value="all">All</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="active">Active</option>
+              <option value="landed">Landed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="incident">Incident</option>
+              <option value="diverted">Diverted</option>
+              <option value="live">Live only</option>
+            </select>
+          </label>
+
+          <label>
+            Direction
+            <select id="filterDirection">
+              <option value="all">Arrivals + Departures</option>
+              <option value="arrival">Arrivals only</option>
+              <option value="departure">Departures only</option>
+            </select>
+          </label>
+
+          <label>
+            Airline
+            <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
+          </label>
+
+          <label>
+            Max flights shown
+            <select id="filterLimit">
+              <option value="all">All</option>
+              <option value="100">100</option>
+              <option value="60">60</option>
+              <option value="40">40</option>
+              <option value="20">20</option>
+            </select>
+          </label>
+
+          <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
+        </section>
+
+        <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
+
+        <div class="viz-grid">
+          <section class="viz-card">
+            <h3>Top Routes to/from YYZ</h3>
+            <p>Most frequent origin/destination pairs from the current live feed.</p>
+            <div class="chart-wrap">
+              <canvas id="topRoutesChart" aria-label="Top routes chart" role="img"></canvas>
+            </div>
+          </section>
+
+          <section class="viz-card">
+            <h3>24-Hour Flight Clock</h3>
+            <p>Flight density by scheduled hour to show daily traffic wave patterns.</p>
+            <div class="chart-wrap">
+              <canvas id="hourlyClockChart" aria-label="24 hour clock chart" role="img"></canvas>
+            </div>
+          </section>
         </div>
+
+        <section class="viz-card artistic-card">
+          <div class="art-header">
+            <div>
+              <h3>Flight Constellation</h3>
+              <p>
+                Each point is a flight, colored by status. Hover to inspect destination,
+                airline, plane ID, status, and schedule.
+              </p>
+            </div>
+            <div class="legend" aria-label="Status legend">
+              <span><i class="dot dot-scheduled"></i>Scheduled</span>
+              <span><i class="dot dot-active"></i>Active</span>
+              <span><i class="dot dot-landed"></i>Landed</span>
+              <span><i class="dot dot-cancelled"></i>Cancelled</span>
+              <span><i class="dot dot-other"></i>Other</span>
+            </div>
+          </div>
+
+          <div id="flightConstellation" class="flight-constellation" aria-live="polite">
+            <div id="flightTooltip" class="flight-tooltip hidden"></div>
+          </div>
+
+          <div id="selectedFlightPanel" class="selected-flight-panel">
+            <h4>Selected flight</h4>
+            <p>Click a point on the map to inspect a flight and highlight it in the board.</p>
+          </div>
+        </section>
       </section>
 
       <section class="table-grid">
@@ -89,16 +176,14 @@
               <thead>
                 <tr>
                   <th>Flight</th>
-                  <th>Airline</th>
                   <th>Route</th>
-                  <th>Scheduled</th>
-                  <th>Actual / Est.</th>
+                  <th>Schedule</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody id="arrivalsTableBody">
                 <tr>
-                  <td colspan="6" class="empty-cell">No arrival data yet.</td>
+                  <td colspan="4" class="empty-cell">No arrival data yet.</td>
                 </tr>
               </tbody>
             </table>
@@ -118,16 +203,14 @@
               <thead>
                 <tr>
                   <th>Flight</th>
-                  <th>Airline</th>
                   <th>Route</th>
-                  <th>Scheduled</th>
-                  <th>Actual / Est.</th>
+                  <th>Schedule</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody id="departuresTableBody">
                 <tr>
-                  <td colspan="6" class="empty-cell">No departure data yet.</td>
+                  <td colspan="4" class="empty-cell">No departure data yet.</td>
                 </tr>
               </tbody>
             </table>
@@ -136,6 +219,7 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

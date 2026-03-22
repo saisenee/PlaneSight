@@ -71,6 +71,11 @@ The starter includes:
 
 Both routes filter data to Toronto Pearson (`YYZ`) and normalize the AviationStack response for the frontend.
 
+Optional AviationStack filters can also be passed through, for example:
+
+- `/api/flights?type=arrival&flight_status=active&limit=30`
+- `/api/flights?type=departure&airline_iata=AC&flight_date=2026-03-17`
+
 ## Vercel notes
 
 - Add the same environment variables in your Vercel project settings.
