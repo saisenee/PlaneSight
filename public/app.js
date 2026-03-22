@@ -1,6 +1,6 @@
 const refreshIntervalMs = Math.max(
-  Number(window.PLANESIGHT_REFRESH_INTERVAL_MS || 300000),
-  10000,
+  Number(window.PLANESIGHT_REFRESH_INTERVAL_MS || 1800000),
+  60000,
 );
 
 const statusColorMap = {
@@ -19,6 +19,7 @@ let latestFlights = [];
 let pollingIntervalId = null;
 let latestArrivals = [];
 let latestDepartures = [];
+let isRefreshing = false;
 
 const elements = {
   refreshButton: document.getElementById("refreshButton"),
@@ -811,6 +812,11 @@ async function fetchFlights(type) {
 }
 
 async function refreshFlights() {
+  if (isRefreshing) {
+    return;
+  }
+
+  isRefreshing = true;
   elements.refreshButton.disabled = true;
   elements.refreshButton.textContent = "Refreshing…";
 
@@ -855,14 +861,21 @@ async function refreshFlights() {
   } catch (error) {
     showNotice(error instanceof Error ? error.message : "Unable to load flight data.");
   } finally {
+    isRefreshing = false;
     elements.refreshButton.disabled = false;
     elements.refreshButton.textContent = "Refresh now";
   }
 }
 
+function refreshWhenVisible() {
+  if (document.visibilityState === "visible") {
+    refreshFlights();
+  }
+}
+
 elements.refreshButton.addEventListener("click", () => {
   if (!pollingIntervalId) {
-    pollingIntervalId = window.setInterval(refreshFlights, refreshIntervalMs);
+    pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
   }
   refreshFlights();
 });
@@ -903,7 +916,8 @@ if (elements.clearFiltersButton) {
 }
 
 refreshFlights();
-pollingIntervalId = window.setInterval(refreshFlights, refreshIntervalMs);
+pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
+document.addEventListener("visibilitychange", refreshWhenVisible);
 
 // Initialize hero scroll animation
 initHeroScrollAnimation();
