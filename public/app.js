@@ -45,6 +45,97 @@ const elements = {
   activeFilterChips: document.getElementById("activeFilterChips"),
 };
 
+// Hero scroll animation
+function initHeroScrollAnimation() {
+  const heroScrollSection = document.querySelector(".hero-scroll-section");
+  const planeWrapper = document.getElementById("heroPlaneWrapper");
+  const landingSequence = document.getElementById("heroLandingSequence");
+  const planeImg = document.querySelector(".hero-plane");
+  const heroDestination = document.querySelector(".hero-destination");
+  const enterDashboardButton = document.querySelector(".landing__cta");
+
+  if (!heroScrollSection || !planeWrapper || !landingSequence) return;
+
+  function updatePlanePosition() {
+    const rect = heroScrollSection.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / rect.height));
+
+    const sectionWidth = heroScrollSection.clientWidth;
+    const planeWidth = planeImg ? planeImg.getBoundingClientRect().width : sectionWidth * 0.33;
+    const startX = -planeWidth * 0.95;
+    const endX = sectionWidth - planeWidth * 0.05;
+    const planeX = startX + (endX - startX) * progress;
+
+    const trackHeight = Math.max(heroScrollSection.clientHeight * 0.56, 280);
+    const startY = 8;
+    const endY = Math.max(96, trackHeight * 0.44);
+    const planeY = startY + (endY - startY) * progress;
+
+    const tilt = -7 + progress * 9;
+    planeWrapper.style.transform = `translate3d(${planeX}px, ${planeY}px, 0) rotate(${tilt}deg)`;
+
+    const arrivalReveal = Math.max(0, Math.min(1, (progress - 0.42) / 0.28));
+    landingSequence.style.opacity = String(arrivalReveal);
+
+    if (planeImg) {
+      planeImg.style.opacity = String(1 - arrivalReveal * 0.58);
+    }
+
+    if (heroDestination) {
+      heroDestination.style.opacity = String(arrivalReveal);
+      heroDestination.style.transform = `translateY(${(1 - arrivalReveal) * 36}px)`;
+    }
+
+    if (arrivalReveal > 0.82) {
+      landingSequence.classList.add("visible");
+      heroScrollSection.classList.add("arrived");
+    } else {
+      landingSequence.classList.remove("visible");
+      heroScrollSection.classList.remove("arrived");
+    }
+  }
+
+  let ticking = false;
+
+  function onScrollOrResize() {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      updatePlanePosition();
+      ticking = false;
+    });
+  }
+
+  window.addEventListener("scroll", onScrollOrResize, { passive: true });
+  window.addEventListener("resize", onScrollOrResize);
+
+  if (enterDashboardButton) {
+    enterDashboardButton.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      const targetY = Math.max(
+        0,
+        heroScrollSection.offsetTop + heroScrollSection.offsetHeight - window.innerHeight,
+      );
+
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+
+      window.scrollTo({
+        top: targetY,
+        behavior,
+      });
+    });
+  }
+
+  updatePlanePosition();
+}
+
 function formatTime(value) {
   if (!value) {
     return "—";
@@ -813,3 +904,6 @@ if (elements.clearFiltersButton) {
 
 refreshFlights();
 pollingIntervalId = window.setInterval(refreshFlights, refreshIntervalMs);
+
+// Initialize hero scroll animation
+initHeroScrollAnimation();
