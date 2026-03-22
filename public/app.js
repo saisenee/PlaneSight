@@ -1,5 +1,5 @@
 const refreshIntervalMs = Math.max(
-  Number(window.PLANESIGHT_REFRESH_INTERVAL_MS || 1800000),
+  Number(window.PLANESIGHT_REFRESH_INTERVAL_MS || 18000000),
   60000,
 );
 
