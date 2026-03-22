@@ -15,6 +15,7 @@ function getConfig() {
     aviationStackBaseUrl:
       process.env.AVIATIONSTACK_BASE_URL || "http://api.aviationstack.com",
     enableAirportEnrichment: process.env.AVIATIONSTACK_ENRICH_AIRPORTS === "true",
+    freezeAviationStack: process.env.AVIATIONSTACK_FREEZE === "true",
   };
 }
 
@@ -359,6 +360,24 @@ module.exports = async function handler(req, res) {
   if (!getConfig().aviationStackApiKey) {
     return res.json(
       placeholderResponse(type, "Set AVIATIONSTACK_API_KEY to load live AviationStack data."),
+    );
+  }
+
+  if (getConfig().freezeAviationStack) {
+    const cachedPayload = getCachedPayload(type);
+
+    if (cachedPayload) {
+      return res.json({
+        ...cachedPayload,
+        message: `Live API calls are currently frozen. Showing cached ${type} data from ${cachedPayload.staleAgeMinutes} minute(s) ago.`,
+      });
+    }
+
+    return res.json(
+      placeholderResponse(
+        type,
+        "Live API calls are currently frozen (AVIATIONSTACK_FREEZE=true). Refreshing is disabled until unfrozen.",
+      ),
     );
   }
 

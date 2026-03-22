@@ -12,6 +12,65 @@ const statusColorMap = {
   diverted: "#d7b6ff",
 };
 
+const airportCoordinateByIata = {
+  YYZ: { lat: 43.6777, lon: -79.6248 },
+  YUL: { lat: 45.4706, lon: -73.7408 },
+  YOW: { lat: 45.3225, lon: -75.6692 },
+  YWG: { lat: 49.9099, lon: -97.2399 },
+  YYC: { lat: 51.1215, lon: -114.0076 },
+  YEG: { lat: 53.3097, lon: -113.5797 },
+  YHZ: { lat: 44.8808, lon: -63.5086 },
+  YQB: { lat: 46.7911, lon: -71.3933 },
+  YQT: { lat: 48.3719, lon: -89.3239 },
+  JFK: { lat: 40.6413, lon: -73.7781 },
+  EWR: { lat: 40.6895, lon: -74.1745 },
+  PHL: { lat: 39.8744, lon: -75.2424 },
+  ATL: { lat: 33.6407, lon: -84.4277 },
+  ORD: { lat: 41.9742, lon: -87.9073 },
+  IAD: { lat: 38.9531, lon: -77.4565 },
+  RDU: { lat: 35.8801, lon: -78.788 },
+  MIA: { lat: 25.7959, lon: -80.2871 },
+  MCO: { lat: 28.4312, lon: -81.3081 },
+  LAS: { lat: 36.084, lon: -115.1537 },
+  AMS: { lat: 52.3105, lon: 4.7683 },
+  LHR: { lat: 51.47, lon: -0.4543 },
+  LIS: { lat: 38.7742, lon: -9.1342 },
+  IST: { lat: 41.2753, lon: 28.7519 },
+  DEL: { lat: 28.5562, lon: 77.1 },
+  ICN: { lat: 37.4602, lon: 126.4407 },
+  AUH: { lat: 24.433, lon: 54.6511 },
+  DXB: { lat: 25.2532, lon: 55.3657 },
+  CAI: { lat: 30.1219, lon: 31.4056 },
+  GIG: { lat: -22.809, lon: -43.2506 },
+  PUJ: { lat: 18.5674, lon: -68.3634 },
+  PDL: { lat: 37.7412, lon: -25.6979 },
+  CDG: { lat: 49.0097, lon: 2.5479 },
+  FRA: { lat: 50.0379, lon: 8.5622 },
+  MUC: { lat: 48.3538, lon: 11.7861 },
+  MAD: { lat: 40.4983, lon: -3.5676 },
+  BCN: { lat: 41.2974, lon: 2.0833 },
+  FCO: { lat: 41.8003, lon: 12.2389 },
+  CPH: { lat: 55.6181, lon: 12.656 },
+  ARN: { lat: 59.6519, lon: 17.9186 },
+  OSL: { lat: 60.1976, lon: 11.1004 },
+  HEL: { lat: 60.3172, lon: 24.9633 },
+  ZRH: { lat: 47.4581, lon: 8.5555 },
+  VIE: { lat: 48.1103, lon: 16.5697 },
+  BRU: { lat: 50.901, lon: 4.4844 },
+  DUB: { lat: 53.4213, lon: -6.2701 },
+  DOH: { lat: 25.2731, lon: 51.6081 },
+  HND: { lat: 35.5494, lon: 139.7798 },
+  NRT: { lat: 35.772, lon: 140.3929 },
+  HKG: { lat: 22.308, lon: 113.9185 },
+  SIN: { lat: 1.3644, lon: 103.9915 },
+  SYD: { lat: -33.9399, lon: 151.1753 },
+  AKL: { lat: -37.0082, lon: 174.785 },
+  MEX: { lat: 19.4363, lon: -99.0721 },
+  LAX: { lat: 33.9416, lon: -118.4085 },
+  SFO: { lat: 37.6213, lon: -122.379 },
+  SEA: { lat: 47.4502, lon: -122.3088 },
+};
+
 let topRoutesChart;
 let hourlyClockChart;
 let selectedFlightId = null;
@@ -375,11 +434,48 @@ function isValidCoordinate(lat, lon) {
     && lon <= 180;
 }
 
+function isRenderableCoordinate(lat, lon) {
+  if (!isValidCoordinate(lat, lon)) {
+    return false;
+  }
+
+  // AviationStack sometimes returns placeholder coordinates at (0, 0),
+  // which clusters all points near the Gulf of Guinea.
+  if (Math.abs(lat) < 0.0001 && Math.abs(lon) < 0.0001) {
+    return false;
+  }
+
+  return true;
+}
+
 function projectCoordinate(lat, lon) {
   return {
     x: ((lon + 180) / 360) * 100,
     y: ((90 - lat) / 180) * 100,
   };
+}
+
+const worldLowAspectRatio = 959.22 / 500;
+
+function mapCoordinateToContainer(point, width, height) {
+  const mapWidth = Math.min(width, height * worldLowAspectRatio);
+  const mapHeight = mapWidth / worldLowAspectRatio;
+  const offsetX = (width - mapWidth) / 2;
+  const offsetY = (height - mapHeight) / 2;
+
+  return {
+    x: ((offsetX + (point.x / 100) * mapWidth) / width) * 100,
+    y: ((offsetY + (point.y / 100) * mapHeight) / height) * 100,
+  };
+}
+
+function knownAirportCoordinate(iata) {
+  if (!iata || typeof iata !== "string") {
+    return null;
+  }
+
+  const code = iata.trim().toUpperCase();
+  return airportCoordinateByIata[code] || null;
 }
 
 function statusLabel(status, isLive) {
@@ -652,18 +748,59 @@ function renderConstellation(flights) {
   svg.setAttribute("preserveAspectRatio", "none");
   container.appendChild(svg);
 
+  const mapWidth = Math.min(width, height * worldLowAspectRatio);
+  const mapHeight = mapWidth / worldLowAspectRatio;
+  const mapOffsetX = (width - mapWidth) / 2;
+  const mapOffsetY = (height - mapHeight) / 2;
+
+  function randomPointInsideMap(flightId) {
+    const mapX = 4 + seededUnit(flightId, "x") * 92;
+    const mapY = 4 + seededUnit(flightId, "y") * 92;
+
+    return {
+      x: ((mapOffsetX + (mapX / 100) * mapWidth) / width) * 100,
+      y: ((mapOffsetY + (mapY / 100) * mapHeight) / height) * 100,
+    };
+  }
+
   flights.forEach((flight) => {
-    const depLat = Number(flight.departureLat);
-    const depLon = Number(flight.departureLon);
-    const arrLat = Number(flight.arrivalLat);
-    const arrLon = Number(flight.arrivalLon);
+    const depRawLat = Number(flight.departureLat);
+    const depRawLon = Number(flight.departureLon);
+    const arrRawLat = Number(flight.arrivalLat);
+    const arrRawLon = Number(flight.arrivalLon);
+
+    const depKnown = knownAirportCoordinate(flight.departureIata);
+    const arrKnown = knownAirportCoordinate(flight.arrivalIata);
+
+    const depLat = isRenderableCoordinate(depRawLat, depRawLon)
+      ? depRawLat
+      : depKnown
+        ? depKnown.lat
+        : Number.NaN;
+    const depLon = isRenderableCoordinate(depRawLat, depRawLon)
+      ? depRawLon
+      : depKnown
+        ? depKnown.lon
+        : Number.NaN;
+    const arrLat = isRenderableCoordinate(arrRawLat, arrRawLon)
+      ? arrRawLat
+      : arrKnown
+        ? arrKnown.lat
+        : Number.NaN;
+    const arrLon = isRenderableCoordinate(arrRawLat, arrRawLon)
+      ? arrRawLon
+      : arrKnown
+        ? arrKnown.lon
+        : Number.NaN;
 
     let x;
     let y;
 
     if (isValidCoordinate(depLat, depLon) && isValidCoordinate(arrLat, arrLon)) {
-      const from = projectCoordinate(depLat, depLon);
-      const to = projectCoordinate(arrLat, arrLon);
+      const rawFrom = projectCoordinate(depLat, depLon);
+      const rawTo = projectCoordinate(arrLat, arrLon);
+      const from = mapCoordinateToContainer(rawFrom, width, height);
+      const to = mapCoordinateToContainer(rawTo, width, height);
 
       const deltaX = to.x - from.x;
       const deltaY = to.y - from.y;
@@ -705,11 +842,28 @@ function renderConstellation(flights) {
       toDot.setAttribute("fill", "rgba(233, 242, 255, 0.72)");
       svg.appendChild(toDot);
 
-      x = (from.x + to.x) / 2;
-      y = (from.y + to.y) / 2;
+      if (flight.direction === "arrival") {
+        x = from.x;
+        y = from.y;
+      } else if (flight.direction === "departure") {
+        x = to.x;
+        y = to.y;
+      } else {
+        x = (from.x + to.x) / 2;
+        y = (from.y + to.y) / 2;
+      }
+    } else if (isValidCoordinate(depLat, depLon)) {
+      const from = mapCoordinateToContainer(projectCoordinate(depLat, depLon), width, height);
+      x = from.x;
+      y = from.y;
+    } else if (isValidCoordinate(arrLat, arrLon)) {
+      const to = mapCoordinateToContainer(projectCoordinate(arrLat, arrLon), width, height);
+      x = to.x;
+      y = to.y;
     } else {
-      x = 8 + seededUnit(flight.id, "x") * 84;
-      y = 12 + seededUnit(flight.id, "y") * 76;
+      const fallback = randomPointInsideMap(flight.id);
+      x = fallback.x;
+      y = fallback.y;
     }
 
     const point = document.createElement("button");
@@ -844,7 +998,11 @@ async function refreshFlights() {
 
     showNotice(message);
 
-    if (message && message.toLowerCase().includes("rate limit")) {
+    if (
+      message
+      && (message.toLowerCase().includes("rate limit")
+        || message.toLowerCase().includes("currently frozen"))
+    ) {
       pauseAutoPollingForRateLimit();
     }
 

@@ -569,13 +569,14 @@ p {
 .flight-constellation {
   position: relative;
   min-height: 460px;
+  aspect-ratio: 959.22 / 500;
   border: 1px dashed rgba(140, 215, 255, 0.45);
   border-radius: 16px;
   background:
     linear-gradient(180deg, rgba(58, 118, 216, 0.2), rgba(4, 14, 58, 0.44)),
-    url("https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg");
+    url("/img/worldLow.svg");
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: contain;
   background-position: center;
   overflow: hidden;
 }
