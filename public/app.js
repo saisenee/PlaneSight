@@ -141,6 +141,8 @@ let latestDepartures = [];
 let latestArrivalTotal = 0;
 let latestDepartureTotal = 0;
 let isRefreshing = false;
+let isLoadingAll = false;
+let responsiveLayoutFrameId = null;
 let constellationMap = null;
 let constellationHost = null;
 let routeLayerGroup = null;
@@ -171,12 +173,14 @@ const elements = {
   flightTooltip: document.getElementById("flightTooltip"),
   selectedFlightPanel: document.getElementById("selectedFlightPanel"),
   filterStatus: document.getElementById("filterStatus"),
-  filterDirection: document.getElementById("filterDirection"),
   filterAirline: document.getElementById("filterAirline"),
+  filterDestination: document.getElementById("filterDestination"),
   filterLimit: document.getElementById("filterLimit"),
   clearFiltersButton: document.getElementById("clearFiltersButton"),
+  loadAllOnceButton: document.getElementById("loadAllOnceButton"),
   activeFilterChips: document.getElementById("activeFilterChips"),
   mapThemeToggle: document.getElementById("mapThemeToggle"),
+  apiUnauthorizedFlag: document.getElementById("apiUnauthorizedFlag"),
 };
 
 // Hero scroll animation
@@ -328,6 +332,10 @@ function initRevealSectionsAndNavWheel() {
   }
 
   navItems.forEach((item) => {
+    if (!item.dataset.label) {
+      item.dataset.label = (item.textContent || "").trim();
+    }
+
     item.addEventListener("click", () => {
       const itemIndex = navItems.indexOf(item);
       if (itemIndex < 0) {
@@ -340,12 +348,62 @@ function initRevealSectionsAndNavWheel() {
 
   let ticking = false;
 
+  function scheduleNavSync() {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      updateNavProgressAnchors();
+      updateNavWheelState();
+      updatePageProgress();
+      ticking = false;
+    });
+  }
+
+  function updateNavProgressAnchors() {
+    const scrollMax = Math.max(
+      1,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+
+    sectionElements.forEach((section, index) => {
+      const navItem = navItems[index];
+      const sectionTop = section.getBoundingClientRect().top + window.scrollY;
+      const triggerMode = navItem && navItem.dataset.trigger === "top" ? "top" : "offset";
+      const sectionAnchor = triggerMode === "top"
+        ? sectionTop
+        : sectionTop + Math.min(section.offsetHeight * 0.08, window.innerHeight * 0.12);
+      const progress = Math.max(0, Math.min(1, sectionAnchor / scrollMax));
+
+      if (!navItem) {
+        return;
+      }
+
+      navItem.style.setProperty("--nav-progress", progress.toFixed(4));
+      navItem.dataset.progress = String(progress);
+    });
+  }
+
+  function updateNavHitState(progress) {
+    navItems.forEach((item) => {
+      const anchor = Number(item.dataset.progress);
+      const isNear = Number.isFinite(anchor) && Math.abs(progress - anchor) <= 0.014;
+      item.classList.toggle("is-hit", isNear);
+    });
+  }
+
   function updateNavWheelState() {
-    const anchorY = window.innerHeight * 0.38;
+    const defaultAnchorY = window.innerHeight * 0.28;
     let bestIndex = 0;
     let bestScore = Number.POSITIVE_INFINITY;
 
     sectionElements.forEach((section, index) => {
+      const navItem = navItems[index];
+      const anchorY = navItem && navItem.dataset.trigger === "top"
+        ? window.innerHeight * 0.08
+        : defaultAnchorY;
       const rect = section.getBoundingClientRect();
       const inAnchorBand = rect.top <= anchorY && rect.bottom >= anchorY;
       const score = inAnchorBand ? 0 : Math.abs(rect.top - anchorY);
@@ -378,25 +436,86 @@ function initRevealSectionsAndNavWheel() {
     if (pageProgressPlane) {
       pageProgressPlane.style.left = `${progress * 100}%`;
     }
+
+    updateNavHitState(progress);
   }
 
   function onScrollOrResize() {
-    if (ticking) {
-      return;
-    }
-
-    ticking = true;
-    window.requestAnimationFrame(() => {
-      updateNavWheelState();
-      updatePageProgress();
-      ticking = false;
-    });
+    scheduleNavSync();
   }
 
   window.addEventListener("scroll", onScrollOrResize, { passive: true });
   window.addEventListener("resize", onScrollOrResize);
+
+  if ("ResizeObserver" in window) {
+    const observer = new ResizeObserver(() => {
+      scheduleNavSync();
+    });
+
+    const pageShell = document.querySelector(".page-shell");
+
+    if (pageShell) {
+      observer.observe(pageShell);
+    }
+
+    sectionElements.forEach((section) => {
+      observer.observe(section);
+    });
+  }
+
+  updateNavProgressAnchors();
   updateNavWheelState();
   updatePageProgress();
+}
+
+function initAirportPhotoRotator() {
+  const airportPhoto = document.querySelector(".hero-airport-photo");
+  const airportVisual = document.querySelector(".hero-airport-visual");
+
+  if (!airportPhoto || !airportVisual) {
+    return;
+  }
+
+  const imageSources = [
+    "img/pearson.jpg",
+    "img/Airport2.avif",
+    "img/Airport3.jpg",
+  ];
+
+  imageSources.forEach((src) => {
+    const preload = new Image();
+    preload.src = src;
+  });
+
+  let activeIndex = imageSources.findIndex((src) => (airportPhoto.getAttribute("src") || "").includes(src));
+
+  if (activeIndex < 0) {
+    activeIndex = 0;
+    airportPhoto.setAttribute("src", imageSources[0]);
+  }
+
+  const overlayPhoto = airportPhoto.cloneNode(true);
+  overlayPhoto.classList.add("hero-airport-photo--overlay", "is-hidden");
+  overlayPhoto.setAttribute("alt", "");
+  overlayPhoto.setAttribute("aria-hidden", "true");
+  airportVisual.appendChild(overlayPhoto);
+
+  let showingOverlay = false;
+
+  function crossfadeTo(nextSrc) {
+    const incoming = showingOverlay ? airportPhoto : overlayPhoto;
+    const outgoing = showingOverlay ? overlayPhoto : airportPhoto;
+
+    incoming.setAttribute("src", nextSrc);
+    incoming.classList.remove("is-hidden");
+    outgoing.classList.add("is-hidden");
+    showingOverlay = !showingOverlay;
+  }
+
+  window.setInterval(() => {
+    activeIndex = (activeIndex + 1) % imageSources.length;
+    crossfadeTo(imageSources[activeIndex]);
+  }, 3000);
 }
 
 function formatTime(value) {
@@ -490,11 +609,24 @@ function buildHourlyBuckets(flights) {
   return buckets;
 }
 
+function isCompactViewport() {
+  return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function shortenLabel(value, maxLength) {
+  if (typeof value !== "string" || value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
 function createOrUpdateTopRoutesChart(flights) {
   if (!elements.topRoutesChart || typeof Chart === "undefined") {
     return;
   }
 
+  const compact = isCompactViewport();
   const topRoutes = buildTopRoutes(flights);
   const labels = topRoutes.map(([route]) => route);
   const values = topRoutes.map(([, count]) => count);
@@ -526,7 +658,12 @@ function createOrUpdateTopRoutesChart(flights) {
         grid: { color: "rgba(196, 217, 243, 0.15)" },
       },
       y: {
-        ticks: { color: "#eff6ff" },
+        ticks: {
+          color: "#eff6ff",
+          callback(value, index) {
+            return shortenLabel(labels[index], compact ? 16 : 34);
+          },
+        },
         grid: { display: false },
       },
     },
@@ -535,6 +672,7 @@ function createOrUpdateTopRoutesChart(flights) {
   if (topRoutesChart) {
     topRoutesChart.data.labels = labels;
     topRoutesChart.data.datasets[0].data = values;
+    topRoutesChart.options = options;
     topRoutesChart.update();
     return;
   }
@@ -551,6 +689,7 @@ function createOrUpdateHourlyClockChart(flights) {
     return;
   }
 
+  const compact = isCompactViewport();
   const hourLabels = Array.from({ length: 24 }, (_, index) =>
     `${String(index).padStart(2, "0")}:00`,
   );
@@ -585,7 +724,8 @@ function createOrUpdateHourlyClockChart(flights) {
           color: "#d0ddf0",
           maxRotation: 0,
           callback(value, index) {
-            return index % 2 === 0 ? hourLabels[index] : "";
+            const stride = compact ? 4 : 2;
+            return index % stride === 0 ? hourLabels[index] : "";
           },
         },
         grid: { color: "rgba(196, 217, 243, 0.12)" },
@@ -601,6 +741,7 @@ function createOrUpdateHourlyClockChart(flights) {
   if (hourlyClockChart) {
     hourlyClockChart.data.labels = hourLabels;
     hourlyClockChart.data.datasets[0].data = values;
+    hourlyClockChart.options = options;
     hourlyClockChart.update();
     return;
   }
@@ -678,6 +819,7 @@ function createOrUpdateDomesticMixChart(flights) {
     domesticMixChart.data.labels = labels;
     domesticMixChart.data.datasets[0].data = values;
     domesticMixChart.data.datasets[0].backgroundColor = dataset.backgroundColor;
+    domesticMixChart.options = options;
     domesticMixChart.update();
     return;
   }
@@ -797,9 +939,29 @@ function airportFlag(iata, countryCode) {
   return countryCodeToFlag(airportCountryCode(iata, countryCode));
 }
 
+function countryFlagHtml(code, label = "Country flag") {
+  const normalizedCode = normalizeCountryCode(code);
+
+  if (!normalizedCode) {
+    return `<span class="flag-emoji flag-emoji--fallback" aria-hidden="true">🌐</span>`;
+  }
+
+  return `<img class="flag-emoji" src="https://flagsapi.com/${normalizedCode}/flat/24.png" alt="${escapeHtml(label)}" loading="lazy" decoding="async" onerror="window.handleCountryFlagError && window.handleCountryFlagError(this)" />`;
+}
+
+function airportFlagHtml(iata, countryCode, label = "Country flag") {
+  const code = airportCountryCode(iata, countryCode);
+  return countryFlagHtml(code, label);
+}
+
 function flagEmojiHtml(iata, countryCode) {
-  const flag = airportFlag(iata, countryCode);
-  return `<span class="flag-emoji" aria-hidden="true">${escapeHtml(flag)}</span>`;
+  return airportFlagHtml(iata, countryCode, "Route country flag");
+}
+
+if (typeof window !== "undefined" && !window.handleCountryFlagError) {
+  window.handleCountryFlagError = (img) => {
+    img.replaceWith(document.createTextNode("🌐"));
+  };
 }
 
 const airlineLogoCatalogueByCode = {
@@ -1097,8 +1259,8 @@ function findFlightById(flightId) {
 function currentFilters() {
   return {
     status: elements.filterStatus ? elements.filterStatus.value : "all",
-    direction: elements.filterDirection ? elements.filterDirection.value : "all",
     airlineQuery: elements.filterAirline ? elements.filterAirline.value.trim().toLowerCase() : "",
+    destinationQuery: elements.filterDestination ? elements.filterDestination.value.trim().toLowerCase() : "",
     limit: elements.filterLimit ? elements.filterLimit.value : "all",
   };
 }
@@ -1114,12 +1276,12 @@ function renderActiveFilterChips(filters) {
     chips.push(`Status: ${filters.status}`);
   }
 
-  if (filters.direction !== "all") {
-    chips.push(`Direction: ${filters.direction}`);
-  }
-
   if (filters.airlineQuery) {
     chips.push(`Airline: ${filters.airlineQuery}`);
+  }
+
+  if (filters.destinationQuery) {
+    chips.push(`Destination: ${filters.destinationQuery}`);
   }
 
   if (filters.limit !== "all") {
@@ -1141,10 +1303,6 @@ function renderActiveFilterChips(filters) {
 function applyFlightFilters(flights, filters) {
   let output = [...flights];
 
-  if (filters.direction !== "all") {
-    output = output.filter((flight) => flight.direction === filters.direction);
-  }
-
   if (filters.status === "live") {
     output = output.filter((flight) => flight.isLive);
   } else if (filters.status !== "all") {
@@ -1155,6 +1313,24 @@ function applyFlightFilters(flights, filters) {
     output = output.filter((flight) =>
       (flight.airline || "").toLowerCase().includes(filters.airlineQuery),
     );
+  }
+
+  if (filters.destinationQuery) {
+    output = output.filter((flight) => {
+      const searchable = [
+        flight.arrivalAirport,
+        flight.arrivalIata,
+        flight.arrivalIcao,
+        flight.departureAirport,
+        flight.departureIata,
+        flight.departureIcao,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(filters.destinationQuery);
+    });
   }
 
   if (filters.limit !== "all") {
@@ -1168,33 +1344,11 @@ function applyFlightFilters(flights, filters) {
 }
 
 function filteredArrivalFlights() {
-  const filters = currentFilters();
-
-  if (filters.direction === "departure") {
-    return [];
-  }
-
-  const statusAdjusted = {
-    ...filters,
-    direction: "all",
-  };
-
-  return applyFlightFilters(latestArrivals, statusAdjusted);
+  return applyFlightFilters(latestArrivals, currentFilters());
 }
 
 function filteredDepartureFlights() {
-  const filters = currentFilters();
-
-  if (filters.direction === "arrival") {
-    return [];
-  }
-
-  const statusAdjusted = {
-    ...filters,
-    direction: "all",
-  };
-
-  return applyFlightFilters(latestDepartures, statusAdjusted);
+  return applyFlightFilters(latestDepartures, currentFilters());
 }
 
 function updateFilteredView() {
@@ -1250,15 +1404,23 @@ function renderSelectedFlightPanel(flight) {
     return;
   }
 
-  const depFlag = airportFlag(flight.departureIata, flight.departureCountryCode);
-  const arrFlag = airportFlag(flight.arrivalIata, flight.arrivalCountryCode);
+  const depFlag = airportFlagHtml(
+    flight.departureIata,
+    flight.departureCountryCode,
+    `${flight.departureIata || "Unknown"} country flag`,
+  );
+  const arrFlag = airportFlagHtml(
+    flight.arrivalIata,
+    flight.arrivalCountryCode,
+    `${flight.arrivalIata || "Unknown"} country flag`,
+  );
 
   elements.selectedFlightPanel.innerHTML = `
     <h4>Selected flight · ${escapeHtml(flight.flightIata)}</h4>
     <div class="selected-flight-grid">
       <div><b>Airline</b><span>${escapeHtml(flight.airline)}</span></div>
       <div><b>Plane ID</b><span>${escapeHtml(flight.aircraftId || "Unknown")}</span></div>
-      <div><b>Route</b><span>${escapeHtml(`${depFlag} ${flight.departureIata || "—"} → ${arrFlag} ${flight.arrivalIata || "—"}`)}</span></div>
+      <div><b>Route</b><span>${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</span></div>
       <div><b>Status</b><span>${escapeHtml(statusLabel(flight.status, flight.isLive))}</span></div>
       <div><b>Schedule</b><span>${escapeHtml(formatTime(flight.scheduledTime))}</span></div>
       <div><b>Actual / Est.</b><span>${escapeHtml(formatTime(flight.actualTime))}</span></div>
@@ -1313,16 +1475,24 @@ function showFlightTooltip(event, flight) {
   const bounds = elements.flightConstellation.getBoundingClientRect();
   const x = Math.min(event.clientX - bounds.left + 14, bounds.width - 260);
   const y = Math.min(event.clientY - bounds.top + 14, bounds.height - 130);
-  const depFlag = countryCodeToFlag(flight.departureCountryCode);
-  const arrFlag = countryCodeToFlag(flight.arrivalCountryCode);
+  const depFlag = airportFlagHtml(
+    flight.departureIata,
+    flight.departureCountryCode,
+    `${flight.departureIata || "Unknown"} country flag`,
+  );
+  const arrFlag = airportFlagHtml(
+    flight.arrivalIata,
+    flight.arrivalCountryCode,
+    `${flight.arrivalIata || "Unknown"} country flag`,
+  );
 
   tooltip.innerHTML = `
-    <strong>${flight.flightIata} · ${flight.airline}</strong>
-    <div><b>Route:</b> ${depFlag} ${flight.departureIata || "—"} → ${arrFlag} ${flight.arrivalIata || "—"}</div>
-    <div><b>Destination:</b> ${flight.arrivalAirport}</div>
-    <div><b>Plane ID:</b> ${flight.aircraftId || flight.flightIata}</div>
-    <div><b>Status:</b> ${statusLabel(flight.status, flight.isLive)}</div>
-    <div><b>Scheduled:</b> ${formatTime(flight.scheduledTime)}</div>
+    <strong>${escapeHtml(flight.flightIata)} · ${escapeHtml(flight.airline)}</strong>
+    <div><b>Route:</b> ${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</div>
+    <div><b>Destination:</b> ${escapeHtml(flight.arrivalAirport || "Unknown")}</div>
+    <div><b>Plane ID:</b> ${escapeHtml(flight.aircraftId || flight.flightIata)}</div>
+    <div><b>Status:</b> ${escapeHtml(statusLabel(flight.status, flight.isLive))}</div>
+    <div><b>Scheduled:</b> ${escapeHtml(formatTime(flight.scheduledTime))}</div>
   `;
 
   tooltip.style.left = `${Math.max(12, x)}px`;
@@ -1374,9 +1544,9 @@ function applyLeafletMapTheme() {
   }
 
   mapTileLayer = window.L.tileLayer(config.url, {
-    minZoom: 1,
+    minZoom: 2,
     maxZoom: 6,
-    noWrap: false,
+    noWrap: true,
     attribution: config.attribution,
   }).addTo(constellationMap);
 
@@ -1441,12 +1611,20 @@ function markerLatLonForFlight(flight, coords) {
 }
 
 function tooltipMarkup(flight) {
-  const depFlag = countryCodeToFlag(flight.departureCountryCode);
-  const arrFlag = countryCodeToFlag(flight.arrivalCountryCode);
+  const depFlag = airportFlagHtml(
+    flight.departureIata,
+    flight.departureCountryCode,
+    `${flight.departureIata || "Unknown"} country flag`,
+  );
+  const arrFlag = airportFlagHtml(
+    flight.arrivalIata,
+    flight.arrivalCountryCode,
+    `${flight.arrivalIata || "Unknown"} country flag`,
+  );
 
   return `
     <strong>${escapeHtml(flight.flightIata)} · ${escapeHtml(flight.airline)}</strong>
-    <div><b>Route:</b> ${escapeHtml(`${depFlag} ${flight.departureIata || "—"} → ${arrFlag} ${flight.arrivalIata || "—"}`)}</div>
+    <div><b>Route:</b> ${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</div>
     <div><b>Destination:</b> ${escapeHtml(flight.arrivalAirport || "Unknown")}</div>
     <div><b>Plane ID:</b> ${escapeHtml(flight.aircraftId || flight.flightIata)}</div>
     <div><b>Status:</b> ${escapeHtml(statusLabel(flight.status, flight.isLive))}</div>
@@ -1485,7 +1663,11 @@ function ensureLeafletConstellation(container) {
   constellationMap = window.L.map(host, {
     zoomControl: true,
     attributionControl: true,
-    worldCopyJump: true,
+    minZoom: 2,
+    maxZoom: 6,
+    worldCopyJump: false,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 1,
   });
 
   applyLeafletMapTheme();
@@ -1855,6 +2037,20 @@ function showNotice(message) {
   elements.noticePanel.classList.remove("hidden");
 }
 
+function updateUnauthorizedFlag(message) {
+  if (!elements.apiUnauthorizedFlag) {
+    return;
+  }
+
+  const normalized = String(message || "").toLowerCase();
+  const isUnauthorized =
+    normalized.includes("unauthorized")
+    || normalized.includes("request failed with 401")
+    || normalized.includes("status 401");
+
+  elements.apiUnauthorizedFlag.classList.toggle("hidden", !isUnauthorized);
+}
+
 function pauseAutoPollingForRateLimit() {
   if (pollingIntervalId) {
     window.clearInterval(pollingIntervalId);
@@ -1862,8 +2058,14 @@ function pauseAutoPollingForRateLimit() {
   }
 }
 
-async function fetchFlights(type) {
-  const response = await fetch(`/api/flights?type=${type}`, {
+async function fetchFlights(type, options = {}) {
+  const query = new URLSearchParams({ type });
+
+  if (options.loadAllOnce) {
+    query.set("all", "1");
+  }
+
+  const response = await fetch(`/api/flights?${query.toString()}`, {
     cache: "no-store",
   });
 
@@ -1877,7 +2079,7 @@ async function fetchFlights(type) {
 }
 
 async function refreshFlights() {
-  if (isRefreshing) {
+  if (isRefreshing || isLoadingAll) {
     return;
   }
 
@@ -1916,6 +2118,7 @@ async function refreshFlights() {
         : "");
 
     showNotice(message);
+    updateUnauthorizedFlag(message);
 
     if (
       message
@@ -1936,11 +2139,88 @@ async function refreshFlights() {
       },
     ).format(new Date())}`;
   } catch (error) {
-    showNotice(error instanceof Error ? error.message : "Unable to load flight data.");
+    const message = error instanceof Error ? error.message : "Unable to load flight data.";
+    showNotice(message);
+    updateUnauthorizedFlag(message);
   } finally {
     isRefreshing = false;
     elements.refreshButton.disabled = false;
     elements.refreshButton.textContent = "Refresh now";
+  }
+}
+
+async function loadAllFlightsOnce() {
+  if (isRefreshing || isLoadingAll) {
+    return;
+  }
+
+  isLoadingAll = true;
+  elements.refreshButton.disabled = true;
+
+  if (elements.loadAllOnceButton) {
+    elements.loadAllOnceButton.disabled = true;
+    elements.loadAllOnceButton.textContent = "Loading all…";
+  }
+
+  try {
+    const [arrivals, departures] = await Promise.all([
+      fetchFlights("arrival", { loadAllOnce: true }),
+      fetchFlights("departure", { loadAllOnce: true }),
+    ]);
+
+    latestArrivals = arrivals.flights.map((flight) => ({
+      ...flight,
+      direction: "arrival",
+    }));
+    latestDepartures = departures.flights.map((flight) => ({
+      ...flight,
+      direction: "departure",
+    }));
+
+    latestArrivalTotal = Number.isFinite(Number(arrivals.totalAvailable))
+      ? Number(arrivals.totalAvailable)
+      : latestArrivals.length;
+    latestDepartureTotal = Number.isFinite(Number(departures.totalAvailable))
+      ? Number(departures.totalAvailable)
+      : latestDepartures.length;
+
+    latestFlights = [...latestArrivals, ...latestDepartures];
+
+    const loadedArrivals = Number.isFinite(Number(arrivals.fetchedCount))
+      ? Number(arrivals.fetchedCount)
+      : latestArrivals.length;
+    const loadedDepartures = Number.isFinite(Number(departures.fetchedCount))
+      ? Number(departures.fetchedCount)
+      : latestDepartures.length;
+
+    const summaryMessage = `Loaded ${loadedArrivals} arrivals and ${loadedDepartures} departures in one paginated snapshot.`;
+    const upstreamMessage = arrivals.message || departures.message || "";
+    const message = upstreamMessage ? `${summaryMessage} ${upstreamMessage}` : summaryMessage;
+    showNotice(message);
+    updateUnauthorizedFlag(message);
+
+    updateFilteredView();
+
+    elements.lastUpdatedText.textContent = `Last updated ${new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      },
+    ).format(new Date())}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to load all flight pages.";
+    showNotice(message);
+    updateUnauthorizedFlag(message);
+  } finally {
+    isLoadingAll = false;
+    elements.refreshButton.disabled = false;
+
+    if (elements.loadAllOnceButton) {
+      elements.loadAllOnceButton.disabled = false;
+      elements.loadAllOnceButton.textContent = "Load all once";
+    }
   }
 }
 
@@ -1950,6 +2230,25 @@ function refreshWhenVisible() {
   }
 }
 
+function reflowResponsiveVisuals() {
+  if (responsiveLayoutFrameId) {
+    window.cancelAnimationFrame(responsiveLayoutFrameId);
+  }
+
+  responsiveLayoutFrameId = window.requestAnimationFrame(() => {
+    responsiveLayoutFrameId = null;
+
+    if (constellationMap) {
+      constellationMap.invalidateSize();
+      hasLeafletViewportSet = false;
+    }
+
+    if (latestFlights.length) {
+      updateFilteredView();
+    }
+  });
+}
+
 elements.refreshButton.addEventListener("click", () => {
   if (!pollingIntervalId) {
     pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
@@ -1957,16 +2256,22 @@ elements.refreshButton.addEventListener("click", () => {
   refreshFlights();
 });
 
+if (elements.loadAllOnceButton) {
+  elements.loadAllOnceButton.addEventListener("click", () => {
+    loadAllFlightsOnce();
+  });
+}
+
 if (elements.filterStatus) {
   elements.filterStatus.addEventListener("change", updateFilteredView);
 }
 
-if (elements.filterDirection) {
-  elements.filterDirection.addEventListener("change", updateFilteredView);
-}
-
 if (elements.filterAirline) {
   elements.filterAirline.addEventListener("input", updateFilteredView);
+}
+
+if (elements.filterDestination) {
+  elements.filterDestination.addEventListener("input", updateFilteredView);
 }
 
 if (elements.filterLimit) {
@@ -1978,11 +2283,11 @@ if (elements.clearFiltersButton) {
     if (elements.filterStatus) {
       elements.filterStatus.value = "all";
     }
-    if (elements.filterDirection) {
-      elements.filterDirection.value = "all";
-    }
     if (elements.filterAirline) {
       elements.filterAirline.value = "";
+    }
+    if (elements.filterDestination) {
+      elements.filterDestination.value = "";
     }
     if (elements.filterLimit) {
       elements.filterLimit.value = "all";
@@ -2003,8 +2308,10 @@ if (elements.mapThemeToggle) {
 
 refreshFlights();
 pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
-document.addEventListener("visibilitychange", refreshWhenVisible);
+window.addEventListener("resize", reflowResponsiveVisuals, { passive: true });
+window.addEventListener("orientationchange", reflowResponsiveVisuals);
 
 // Initialize hero scroll animation
 initHeroScrollAnimation();
 initRevealSectionsAndNavWheel();
+initAirportPhotoRotator();

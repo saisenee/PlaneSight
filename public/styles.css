@@ -25,7 +25,7 @@
 html {
   background: #000b48;
   scroll-behavior: smooth;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 body {
@@ -36,7 +36,7 @@ body {
   font-family: "DM Sans", Arial, Helvetica, sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 button,
@@ -51,9 +51,9 @@ code {
 }
 
 .page-shell {
-  width: min(1020px, calc(100% - 300px));
-  margin: 0 auto 0 160px;
-  padding: 24px 0 64px;
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 24px 0 104px;
   display: flex;
   flex-direction: column;
   gap: clamp(34px, 6vh, 72px);
@@ -100,38 +100,73 @@ code {
 }
 
 .side-nav {
-  position: fixed;
-  left: 22px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 35;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .side-nav-item {
-  text-align: left;
-  border: 0;
-  background: transparent;
-  color: rgba(231, 244, 255, 0.5);
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  padding: 4px 6px;
+  position: absolute;
+  left: calc(var(--nav-progress, 0) * 100%);
+  top: 34%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(193, 224, 249, 0.62);
+  background: rgba(10, 33, 88, 0.34);
+  color: transparent;
+  font-size: 0;
+  padding: 0;
+  pointer-events: auto;
   cursor: pointer;
-  transition: color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.side-nav-item:hover {
-  color: rgba(231, 244, 255, 0.92);
+.side-nav-item::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(193, 224, 249, 0.72);
+  background: rgba(10, 33, 88, 0.94);
+}
+
+.side-nav-item::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  color: rgba(216, 233, 250, 0.76);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .side-nav-item.active {
-  color: rgba(255, 255, 255, 1);
-  font-weight: 700;
-  opacity: 1;
-  transform: translateX(3px);
+  border-color: rgba(167, 226, 255, 0.95);
+  background: rgba(61, 149, 224, 0.42);
+  box-shadow:
+    0 0 0 2px rgba(87, 176, 242, 0.22),
+    0 0 14px rgba(86, 204, 242, 0.3);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.side-nav-item.is-hit {
+  border-color: rgba(198, 238, 255, 0.98);
+  background: rgba(86, 204, 242, 0.48);
+  box-shadow:
+    0 0 0 4px rgba(127, 214, 255, 0.2),
+    0 0 20px rgba(127, 214, 255, 0.56);
+  transform: translate(-50%, -50%) scale(1.13);
 }
 
 .page-progress {
@@ -139,17 +174,39 @@ code {
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(620px, calc(100vw - 110px));
-  z-index: 36;
+  width: min(1120px, calc(100vw - 24px));
+  height: 96px;
+  z-index: 42;
   pointer-events: none;
 }
 
+.bottom-veil {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 180px;
+  pointer-events: none;
+  z-index: 40;
+  background: linear-gradient(
+    0deg,
+    rgba(0, 11, 72, 0.86) 0%,
+    rgba(5, 21, 78, 0.72) 28%,
+    rgba(6, 25, 84, 0.4) 54%,
+    rgba(7, 29, 90, 0) 100%
+  );
+}
+
 .page-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
   position: relative;
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(223, 238, 255, 0.22);
-  border: 1px solid rgba(171, 211, 246, 0.42);
+  background: rgba(186, 216, 245, 0.3);
+  border: 1px solid rgba(171, 211, 246, 0.54);
   overflow: visible;
 }
 
@@ -158,18 +215,21 @@ code {
   width: 0%;
   border-radius: inherit;
   background: linear-gradient(90deg, rgba(127, 214, 255, 0.92), rgba(86, 204, 242, 0.98));
-  transition: width 0.08s linear;
+  transition: none;
 }
 
 .page-progress-plane {
   position: absolute;
   top: 50%;
   left: 0;
-  transform: translate(-50%, -58%);
-  width: 30px;
-  height: 30px;
+  transform: translate(-50%, -55%);
+  width: 40px;
+  height: 40px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.42));
+  filter:
+    drop-shadow(0 5px 12px rgba(0, 0, 0, 0.34))
+    drop-shadow(0 0 8px rgba(132, 220, 255, 0.34));
+  transition: none;
 }
 
 .refresh-floating {
@@ -181,6 +241,24 @@ code {
   flex-direction: column;
   align-items: flex-end;
   gap: 3px;
+}
+
+.api-unauthorized-flag {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 163, 163, 0.72);
+  background: rgba(92, 10, 21, 0.9);
+  color: #ffd9dc;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
 }
 
 .refresh-floating .button {
@@ -390,12 +468,20 @@ code {
   max-width: 500px;
 }
 
+.hero-airport-name {
+  margin: 0 0 12px;
+  font-size: clamp(1rem, 1.6vw, 1.22rem);
+  color: #ecf5ff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .hero-destination-content {
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
   gap: clamp(18px, 2.8vw, 34px);
-  align-items: start;
+  align-items: stretch;
 }
 
 .hero-destination-copy {
@@ -406,16 +492,35 @@ code {
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
 }
 
 .hero-airport-photo {
   width: 100%;
-  max-width: 360px;
-  aspect-ratio: 4 / 3;
+  max-width: none;
+  height: 100%;
+  display: block;
   object-fit: cover;
-  border-radius: 18px;
+  border-radius: inherit;
   border: 1px solid rgba(209, 227, 247, 0.35);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+  opacity: 1;
+  will-change: opacity;
+  transition: opacity 0.38s ease-in-out;
+}
+
+.hero-airport-photo.is-hidden {
+  opacity: 0;
+}
+
+.hero-airport-photo.hero-airport-photo--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .hero-actions {
@@ -570,9 +675,13 @@ p {
 .filter-bar {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
+}
+
+#loadAllOnceButton {
+  min-height: 38px;
 }
 
 .filter-chips {
@@ -657,6 +766,7 @@ p {
   border-radius: 18px;
   padding: 24px;
   background: rgba(4, 14, 58, 0.72);
+  min-width: 0;
 }
 
 .viz-card h3 {
@@ -670,7 +780,16 @@ p {
 }
 
 .chart-wrap {
-  height: 360px;
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  height: clamp(220px, 34vw, 360px);
+}
+
+.chart-wrap canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .artistic-card {
@@ -761,16 +880,12 @@ p {
 
 .flight-constellation {
   position: relative;
-  min-height: 460px;
+  width: 100%;
+  min-height: clamp(300px, 54vw, 460px);
   aspect-ratio: 2 / 1;
   border: 1px dashed rgba(140, 215, 255, 0.45);
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(58, 118, 216, 0.2), rgba(4, 14, 58, 0.44)),
-    url("/img/world-equirect.svg");
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
+  background: linear-gradient(180deg, rgba(58, 118, 216, 0.2), rgba(4, 14, 58, 0.44));
   overflow: hidden;
 }
 
@@ -959,14 +1074,32 @@ p {
   gap: 28px;
 }
 
+#arrivalsSection,
+#departuresSection {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .table-wrapper {
+  position: relative;
+  isolation: isolate;
   overflow-x: auto;
-  padding: 8px 24px 24px;
+  overflow-y: auto;
+  max-height: clamp(320px, 46vh, 520px);
+  padding: 0 24px 24px;
 }
 
 .flight-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.flight-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 6;
 }
 
 .flight-table th,
@@ -986,6 +1119,9 @@ p {
 }
 
 .flight-table th {
+  background: #0b2375;
+  background-clip: padding-box;
+  box-shadow: 0 10px 14px rgba(4, 14, 58, 0.38);
   color: #eff6ff;
   font-size: 0.84rem;
   letter-spacing: 0.04em;
@@ -1020,10 +1156,24 @@ p {
 }
 
 .flag-emoji {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid rgba(171, 194, 230, 0.45);
+  background: rgba(255, 255, 255, 0.92);
+  vertical-align: -0.12em;
+}
+
+.flag-emoji--fallback {
+  width: auto;
+  height: auto;
+  border: 0;
+  background: transparent;
   font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
   font-size: 1.02em;
   line-height: 1;
-  vertical-align: -0.08em;
 }
 
 .status-badge {
@@ -1057,16 +1207,12 @@ p {
 }
 
 @media (max-width: 1080px) {
-  .side-nav {
-    display: none;
-  }
-
   .page-progress {
-    width: min(520px, calc(100vw - 24px));
+    width: min(960px, calc(100vw - 18px));
   }
 
   .page-shell {
-    width: min(100% - 40px, 1020px);
+    width: min(100% - 40px, 1180px);
     margin: 0 auto;
   }
 
@@ -1084,6 +1230,10 @@ p {
 
   .viz-grid {
     grid-template-columns: 1fr;
+  }
+
+  #domesticMixSection {
+    grid-column: auto;
   }
 
   .selected-flight-grid {
@@ -1109,8 +1259,8 @@ p {
 
 @media (max-width: 760px) {
   .page-shell {
-    width: min(100% - 20px, 1120px);
-    padding: 14px 0 42px;
+    width: min(100% - 24px, 1120px);
+    padding: 14px 0 56px;
     gap: 26px;
   }
 
@@ -1174,9 +1324,11 @@ p {
 
   .hero-airport-visual {
     justify-content: flex-start;
+    height: auto;
   }
 
   .hero-airport-photo {
+    height: auto;
     max-width: 100%;
     aspect-ratio: 16 / 9;
   }
@@ -1187,6 +1339,57 @@ p {
 
   .hero-plane {
     width: clamp(150px, 50vw, 400px);
+  }
+
+  .page-progress {
+    height: 86px;
+    width: calc(100vw - 24px);
+  }
+
+  .page-progress,
+  .bottom-veil {
+    display: none;
+  }
+
+  .page-progress-track {
+    bottom: 8px;
+  }
+
+  .side-nav-item {
+    width: 24px;
+    height: 24px;
+    top: 40%;
+  }
+
+  .side-nav-item::before {
+    inset: 4px;
+  }
+
+  .side-nav-item::after {
+    display: none;
+  }
+
+  .side-nav-item.active::after,
+  .side-nav-item.is-hit::after {
+    display: block;
+    top: calc(100% + 6px);
+    background: rgba(5, 21, 78, 0.86);
+    border: 1px solid rgba(171, 211, 246, 0.4);
+    border-radius: 999px;
+    padding: 3px 7px;
+  }
+
+  .bottom-veil {
+    height: 148px;
+  }
+
+  .chart-wrap {
+    min-height: 260px;
+    height: clamp(260px, 66vw, 320px);
+  }
+
+  .flight-constellation {
+    min-height: clamp(260px, 72vw, 360px);
   }
 }
 

@@ -29,6 +29,10 @@
       <p id="lastUpdatedText">Waiting for first refresh</p>
     </div>
 
+    <div id="apiUnauthorizedFlag" class="api-unauthorized-flag hidden" role="status" aria-live="polite">
+      API key unauthorized
+    </div>
+
     <main class="page-shell">
       <section id="landingSection" class="landing reveal-section" aria-label="PlaneSight landing page">
         <div class="landing__content">
@@ -57,9 +61,11 @@
               <img src="img/pearsonlogo.png" alt="Toronto Pearson logo" class="hero-pearson-logo" />
             </div>
             <div class="hero-destination-content">
-              <div class="hero-destination-copy">
-                <h1 id="pearsonTitle">Toronto Pearson<br />International Airport</h1>
-                <p>Toronto Pearson International Airport (YYZ) is Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.
+              <div id="airportDataSection" class="hero-destination-copy">
+                <span class="eyebrow">Airport Data</span>
+                <h1 id="pearsonTitle">Toronto Pearson Airport</h1>
+                <p class="hero-airport-name">Lester B. Pearson International Airport (YYZ)</p>
+                <p>Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.
                 </p>
                 <div class="hero-actions">
                   <a class="button button-ghost" href="https://www.torontopearson.com/en" target="_blank" rel="noopener noreferrer">Visit Site</a>
@@ -131,17 +137,13 @@
             </label>
 
             <label>
-              Direction
-              <select id="filterDirection">
-                <option value="all">Arrivals + Departures</option>
-                <option value="arrival">Arrivals only</option>
-                <option value="departure">Departures only</option>
-              </select>
+              Airline
+              <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
             </label>
 
             <label>
-              Airline
-              <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
+              Destination
+              <input id="filterDestination" type="text" placeholder="e.g. Vancouver or YVR" />
             </label>
 
             <label>
@@ -156,6 +158,7 @@
             </label>
 
             <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
+            <button id="loadAllOnceButton" class="button button-ghost" type="button">Load all once</button>
           </section>
 
           <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
@@ -295,21 +298,22 @@
       </footer>
     </main>
 
-    <nav class="side-nav" aria-label="Section quick navigation">
-      <button class="side-nav-item" type="button" data-target="landingSection">Home</button>
-      <button class="side-nav-item" type="button" data-target="topRoutesSection">Top Routes</button>
-      <button class="side-nav-item" type="button" data-target="hourlyClockSection">24-Hour Clock</button>
-      <button class="side-nav-item" type="button" data-target="domesticMixSection">Domestic vs Intl</button>
-      <button class="side-nav-item" type="button" data-target="constellationSection">Flight Map</button>
-      <button class="side-nav-item" type="button" data-target="arrivalsSection">Arrivals</button>
-      <button class="side-nav-item" type="button" data-target="departuresSection">Departures</button>
-    </nav>
+    <div class="bottom-veil" aria-hidden="true"></div>
 
     <div class="page-progress" aria-hidden="true">
       <div class="page-progress-track">
         <div id="pageProgressFill" class="page-progress-fill"></div>
         <img id="pageProgressPlane" class="page-progress-plane" src="img/planeicon.png" alt="" />
       </div>
+      <nav class="side-nav" aria-label="Section quick navigation">
+        <button class="side-nav-item" type="button" data-target="landingSection" data-label="Home">Home</button>
+        <button class="side-nav-item" type="button" data-target="airportDataSection" data-label="Flight Data" data-trigger="top">Flight Data</button>
+        <button class="side-nav-item" type="button" data-target="topRoutesSection" data-label="Top Routes">Top Routes</button>
+        <button class="side-nav-item" type="button" data-target="hourlyClockSection" data-label="24-Hour Clock">24-Hour Clock</button>
+        <button class="side-nav-item" type="button" data-target="domesticMixSection" data-label="Domestic vs Intl">Domestic vs Intl</button>
+        <button class="side-nav-item" type="button" data-target="constellationSection" data-label="Flight Map">Flight Map</button>
+        <button class="side-nav-item" type="button" data-target="arrivalsSection" data-label="Flight Board" data-trigger="top">Flight Board</button>
+      </nav>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>

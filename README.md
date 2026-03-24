@@ -1,12 +1,13 @@
 # PlaneSight
 
-PlaneSight is a starter dashboard for visualizing live flight activity to and from Toronto Pearson Airport (`YYZ`) using AviationStack.
+PlaneSight is a starter dashboard for visualizing live flight activity to and from Toronto Pearson Airport (`YYZ`) using AviationStack, with OpenSky integration for live map telemetry.
 
 ## What is included
 
 - Plain frontend in `public/index.html`, `public/styles.css`, and `public/app.js`
 - Node/Express local preview server in `server.js`
 - Server-side API route at `/api/flights` using `api/flights.js`
+- Server-side OpenSky map route at `/api/opensky/states` using `api/opensky.js`
 - Starter dashboard for arrivals, departures, refresh state, and live-flight counts
 - `chart.js` installed for future visualization work
 - Placeholder environment variables for AviationStack and optional MongoDB-backed secret storage later
@@ -58,6 +59,14 @@ server.js
 
 - `AVIATIONSTACK_API_KEY`: required for live data
 - `AVIATIONSTACK_BASE_URL`: defaults to `http://api.aviationstack.com`
+- `OPENSKY_API_KEY`: optional bearer key for OpenSky map requests
+- `OPENSKY_STATES_URL`: OpenSky states endpoint, defaults to `https://opensky-network.org/api/states/all`
+- `OPENSKY_CACHE_TTL_MS`: OpenSky route cache duration (default 30000)
+- `OPENSKY_TIMEOUT_MS`: OpenSky request timeout in ms (default 12000)
+- `OPENSKY_BBOX_LAMIN`: OpenSky bbox south latitude
+- `OPENSKY_BBOX_LOMIN`: OpenSky bbox west longitude
+- `OPENSKY_BBOX_LAMAX`: OpenSky bbox north latitude
+- `OPENSKY_BBOX_LOMAX`: OpenSky bbox east longitude
 - `PORT`: local server port, defaults to `3000`
 - `MONGODB_URI`: optional placeholder for future secret/config storage
 - `MONGODB_DB_NAME`: optional placeholder database name
@@ -70,6 +79,11 @@ The starter includes:
 - `/api/flights?type=departure`
 
 Both routes filter data to Toronto Pearson (`YYZ`) and normalize the AviationStack response for the frontend.
+
+OpenSky map route:
+
+- `/api/opensky/states` (defaults to Toronto-area bounding box)
+- `/api/opensky/states?lamin=41.5&lomin=-82.5&lamax=45.8&lomax=-76.0` (custom region)
 
 Optional AviationStack filters can also be passed through, for example:
 

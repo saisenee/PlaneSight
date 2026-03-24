@@ -8,6 +8,12 @@ const flightsCache = {
   arrival: null,
   departure: null,
 };
+const flightsTtlCache = new Map();
+
+const DEFAULT_PAGE_LIMIT = 100;
+const MAX_PAGE_LIMIT = 100;
+const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
+const DEFAULT_MAX_LOAD_ALL_PAGES = 20;
 
 function getConfig() {
   return {
@@ -16,6 +22,9 @@ function getConfig() {
       process.env.AVIATIONSTACK_BASE_URL || "http://api.aviationstack.com",
     enableAirportEnrichment: process.env.AVIATIONSTACK_ENRICH_AIRPORTS === "true",
     freezeAviationStack: process.env.AVIATIONSTACK_FREEZE === "true",
+    defaultLimit: Number(process.env.AVIATIONSTACK_DEFAULT_LIMIT || DEFAULT_PAGE_LIMIT),
+    cacheTtlMs: Number(process.env.AVIATIONSTACK_CACHE_TTL_MS || DEFAULT_CACHE_TTL_MS),
+    maxLoadAllPages: Number(process.env.AVIATIONSTACK_MAX_LOAD_ALL_PAGES || DEFAULT_MAX_LOAD_ALL_PAGES),
   };
 }
 
@@ -62,12 +71,114 @@ function readQueryValue(query, key) {
   return value;
 }
 
+function toPositiveInt(value, fallback) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
+}
+
+function normalizeLimit(value) {
+  return Math.max(1, Math.min(MAX_PAGE_LIMIT, toPositiveInt(value, DEFAULT_PAGE_LIMIT)));
+}
+
+function resolvedPageLimit(query = {}) {
+  const config = getConfig();
+  const queryLimit = readQueryValue(query, "limit");
+
+  if (queryLimit) {
+    return normalizeLimit(queryLimit);
+  }
+
+  return normalizeLimit(config.defaultLimit);
+}
+
+function isLoadAllRequested(query = {}) {
+  const raw = String(readQueryValue(query, "all") || "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function buildCacheKey(type, query = {}) {
+  const all = isLoadAllRequested(query) ? "all" : "single";
+  const limit = resolvedPageLimit(query);
+  const filterPairs = passthroughParams
+    .filter((key) => key !== "offset" && key !== "limit")
+    .map((key) => {
+      const value = readQueryValue(query, key);
+      return [key, typeof value === "string" ? value.trim() : ""];
+    })
+    .filter(([, value]) => value)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return `${type}|${all}|limit=${limit}|${filterPairs}`;
+}
+
+function buildLivePayload(type, payload) {
+  return {
+    airportCode: airportConfig.code,
+    airportName: airportConfig.name,
+    type,
+    count: payload.flights.length,
+    fetchedCount: payload.fetchedCount,
+    totalAvailable: payload.totalAvailable,
+    lastUpdated: new Date(payload.updatedAt || Date.now()).toISOString(),
+    source: "aviationstack",
+    placeholder: false,
+    stale: false,
+    flights: payload.flights,
+    ...(payload.cached ? { cached: true } : {}),
+    ...(payload.pagesFetched ? { pagesFetched: payload.pagesFetched } : {}),
+    ...(payload.pageLimit ? { pageLimit: payload.pageLimit } : {}),
+    ...(payload.message ? { message: payload.message } : {}),
+  };
+}
+
+function getFreshCachedPayload(type, query = {}) {
+  const cacheKey = buildCacheKey(type, query);
+  const cacheEntry = flightsTtlCache.get(cacheKey);
+
+  if (!cacheEntry) {
+    return null;
+  }
+
+  const ttlMs = Math.max(60 * 1000, toPositiveInt(getConfig().cacheTtlMs, DEFAULT_CACHE_TTL_MS));
+  const ageMs = Date.now() - cacheEntry.updatedAt;
+
+  if (ageMs > ttlMs) {
+    return null;
+  }
+
+  return buildLivePayload(type, {
+    ...cacheEntry,
+    cached: true,
+    message: `Serving cached ${type} data (${Math.round(ageMs / 1000)}s old) to reduce API usage.`,
+  });
+}
+
+function storeTtlCache(type, query, result) {
+  const cacheKey = buildCacheKey(type, query);
+
+  flightsTtlCache.set(cacheKey, {
+    flights: result.flights,
+    totalAvailable: result.totalAvailable,
+    fetchedCount: result.fetchedCount,
+    pagesFetched: result.pagesFetched,
+    pageLimit: result.pageLimit,
+    updatedAt: Date.now(),
+  });
+}
+
 function buildAviationStackUrl(type, query = {}) {
   const config = getConfig();
   const url = new URL("/v1/flights", config.aviationStackBaseUrl);
 
   url.searchParams.set("access_key", config.aviationStackApiKey);
-  url.searchParams.set("limit", String(readQueryValue(query, "limit") || 20));
+  url.searchParams.set("limit", String(resolvedPageLimit(query)));
 
   for (const key of passthroughParams) {
     const value = readQueryValue(query, key);
@@ -333,6 +444,50 @@ async function loadFlights(type, query) {
     flights,
     totalAvailable,
     fetchedCount: flights.length,
+    pagesFetched: 1,
+    pageLimit: resolvedPageLimit(query),
+  };
+}
+
+async function loadAllFlights(type, query) {
+  const pageLimit = resolvedPageLimit(query);
+  const maxPages = Math.max(1, toPositiveInt(getConfig().maxLoadAllPages, DEFAULT_MAX_LOAD_ALL_PAGES));
+  const mergedFlights = [];
+  let totalAvailable = null;
+  let pagesFetched = 0;
+  let offset = 0;
+
+  while (pagesFetched < maxPages) {
+    const pageQuery = {
+      ...query,
+      limit: String(pageLimit),
+      offset: String(offset),
+    };
+
+    const pageResult = await loadFlights(type, pageQuery);
+    mergedFlights.push(...pageResult.flights);
+    pagesFetched += 1;
+
+    if (Number.isFinite(pageResult.totalAvailable)) {
+      totalAvailable = pageResult.totalAvailable;
+    }
+
+    const reachedTotal = Number.isFinite(totalAvailable) && mergedFlights.length >= totalAvailable;
+    const reachedPageEnd = pageResult.fetchedCount < pageLimit;
+
+    if (reachedTotal || reachedPageEnd) {
+      break;
+    }
+
+    offset += pageLimit;
+  }
+
+  return {
+    flights: mergedFlights,
+    totalAvailable: Number.isFinite(totalAvailable) ? totalAvailable : mergedFlights.length,
+    fetchedCount: mergedFlights.length,
+    pagesFetched,
+    pageLimit,
   };
 }
 
@@ -397,8 +552,16 @@ module.exports = async function handler(req, res) {
     );
   }
 
+  const freshCachedPayload = getFreshCachedPayload(type, req.query);
+
+  if (freshCachedPayload) {
+    return res.json(freshCachedPayload);
+  }
+
   try {
-    const result = await loadFlights(type, req.query);
+    const result = isLoadAllRequested(req.query)
+      ? await loadAllFlights(type, req.query)
+      : await loadFlights(type, req.query);
     const flights = result.flights;
 
     flightsCache[type] = {
@@ -407,18 +570,19 @@ module.exports = async function handler(req, res) {
       updatedAt: Date.now(),
     };
 
-    return res.json({
-      airportCode: airportConfig.code,
-      airportName: airportConfig.name,
-      type,
-      count: flights.length,
+    storeTtlCache(type, req.query, result);
+
+    return res.json(buildLivePayload(type, {
+      flights,
       fetchedCount: result.fetchedCount,
       totalAvailable: result.totalAvailable,
-      lastUpdated: new Date().toISOString(),
-      source: "aviationstack",
-      placeholder: false,
-      flights,
-    });
+      pagesFetched: result.pagesFetched,
+      pageLimit: result.pageLimit,
+      updatedAt: Date.now(),
+      message: isLoadAllRequested(req.query)
+        ? `Loaded ${result.fetchedCount} ${type} flights across ${result.pagesFetched} page(s).`
+        : undefined,
+    }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to fetch live flight data.";
     const rateLimited = message.includes(" 429");
