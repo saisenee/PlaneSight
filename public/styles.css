@@ -53,7 +53,7 @@ code {
 .page-shell {
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 24px 0 104px;
+  padding: 24px 0 140px;
   display: flex;
   flex-direction: column;
   gap: clamp(34px, 6vh, 72px);
@@ -1441,4 +1441,28 @@ p {
     0 0 0 1px rgba(143, 214, 255, 0.25),
     0 0 38px rgba(97, 196, 255, 0.18);
   border-color: rgba(170, 226, 255, 0.65);
+}
+
+.footer-credit {
+  margin-top: 10px;
+  opacity: 0.72;
+}
+
+.footer-credit p {
+  margin: 3px 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #c6d8f2;
+}
+
+.footer-credit a {
+  color: #b8daff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer-credit__disclaimer {
+  margin-top: 6px;
+  font-style: italic;
+  color: #b9cdec;
 }
