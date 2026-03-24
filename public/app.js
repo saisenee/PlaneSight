@@ -1419,7 +1419,7 @@ function renderSelectedFlightPanel(flight) {
     <h4>Selected flight · ${escapeHtml(flight.flightIata)}</h4>
     <div class="selected-flight-grid">
       <div><b>Airline</b><span>${escapeHtml(flight.airline)}</span></div>
-      <div><b>Plane ID</b><span>${escapeHtml(flight.aircraftId || "Unknown")}</span></div>
+      <div><b>Aircraft</b><span>${escapeHtml(flight.aircraftModel ? `${flight.aircraftModel} (${flight.aircraftId})` : (flight.aircraftId || "Unknown"))}</span></div>
       <div><b>Route</b><span>${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</span></div>
       <div><b>Status</b><span>${escapeHtml(statusLabel(flight.status, flight.isLive))}</span></div>
       <div><b>Schedule</b><span>${escapeHtml(formatTime(flight.scheduledTime))}</span></div>
@@ -1490,7 +1490,7 @@ function showFlightTooltip(event, flight) {
     <strong>${escapeHtml(flight.flightIata)} · ${escapeHtml(flight.airline)}</strong>
     <div><b>Route:</b> ${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</div>
     <div><b>Destination:</b> ${escapeHtml(flight.arrivalAirport || "Unknown")}</div>
-    <div><b>Plane ID:</b> ${escapeHtml(flight.aircraftId || flight.flightIata)}</div>
+    <div><b>Aircraft:</b> ${escapeHtml(flight.aircraftModel ? `${flight.aircraftModel} (${flight.aircraftId})` : (flight.aircraftId || flight.flightIata))}</div>
     <div><b>Status:</b> ${escapeHtml(statusLabel(flight.status, flight.isLive))}</div>
     <div><b>Scheduled:</b> ${escapeHtml(formatTime(flight.scheduledTime))}</div>
   `;
@@ -1626,7 +1626,7 @@ function tooltipMarkup(flight) {
     <strong>${escapeHtml(flight.flightIata)} · ${escapeHtml(flight.airline)}</strong>
     <div><b>Route:</b> ${depFlag} ${escapeHtml(flight.departureIata || "—")} → ${arrFlag} ${escapeHtml(flight.arrivalIata || "—")}</div>
     <div><b>Destination:</b> ${escapeHtml(flight.arrivalAirport || "Unknown")}</div>
-    <div><b>Plane ID:</b> ${escapeHtml(flight.aircraftId || flight.flightIata)}</div>
+    <div><b>Aircraft:</b> ${escapeHtml(flight.aircraftModel ? `${flight.aircraftModel} (${flight.aircraftId})` : (flight.aircraftId || flight.flightIata))}</div>
     <div><b>Status:</b> ${escapeHtml(statusLabel(flight.status, flight.isLive))}</div>
     <div><b>Scheduled:</b> ${escapeHtml(formatTime(flight.scheduledTime))}</div>
   `;

@@ -10,6 +10,118 @@ const flightsCache = {
 };
 const flightsTtlCache = new Map();
 
+// ICAO24 code to aircraft model mapping (Option 2)
+// Maps ICAO24 transponder codes to aircraft model names
+const aircraftModelLookup = {
+  // Airbus (common aircraft codes starting with A)
+  A20N: "Airbus A220",
+  A300: "Airbus A300",
+  A310: "Airbus A310",
+  A319: "Airbus A319",
+  A320: "Airbus A320",
+  A321: "Airbus A321",
+  A330: "Airbus A330",
+  A340: "Airbus A340",
+  A350: "Airbus A350",
+  A380: "Airbus A380",
+  A32N: "Airbus A320neo",
+  A32L: "Airbus A320",
+  A21N: "Airbus A220neo",
+  A33N: "Airbus A330neo",
+  A35K: "Airbus A350-1000",
+  A359: "Airbus A350-900",
+  
+  // Boeing (common aircraft codes starting with B)
+  B717: "Boeing 717",
+  B721: "Boeing 727-100",
+  B722: "Boeing 727-200",
+  B732: "Boeing 737-200",
+  B734: "Boeing 737-400",
+  B735: "Boeing 737-500",
+  B736: "Boeing 737-600",
+  B737: "Boeing 737-700",
+  B738: "Boeing 737-800",
+  B739: "Boeing 737-900",
+  B73J: "Boeing 737 MAX 8",
+  B73H: "Boeing 737-800",
+  B73F: "Boeing 737-700",
+  B73E: "Boeing 737",
+  B7M9: "Boeing 737 MAX 9",
+  B741: "Boeing 747-100",
+  B742: "Boeing 747-200",
+  B744: "Boeing 747-400",
+  B748: "Boeing 747-8",
+  B751: "Boeing 757-100",
+  B752: "Boeing 757-200",
+  B761: "Boeing 767-100",
+  B762: "Boeing 767-200",
+  B763: "Boeing 767-300",
+  B764: "Boeing 767-400",
+  B771: "Boeing 777-100",
+  B772: "Boeing 777-200",
+  B77L: "Boeing 777-200LR",
+  B77W: "Boeing 777-300ER",
+  B77X: "Boeing 777X",
+  B787: "Boeing 787-8",
+  B788: "Boeing 787-8",
+  B789: "Boeing 787-9",
+  B78X: "Boeing 787-10",
+  B790: "Boeing 787",
+  
+  // Bombardier (CRJ and DHC series)
+  CRJ2: "Bombardier CRJ-200",
+  CRJ7: "Bombardier CRJ-700",
+  CRJ8: "Bombardier CRJ-800",
+  CRJ9: "Bombardier CRJ-900",
+  CRJ1: "Bombardier CRJ-1000",
+  DH1: "Bombardier DHC-8-100",
+  DH2: "Bombardier DHC-8-200",
+  DH3: "Bombardier DHC-8-300",
+  DH4: "Bombardier DHC-8-400",
+  
+  // Embraer (E-series regional jets)
+  E170: "Embraer E170",
+  E175: "Embraer E175",
+  E75L: "Embraer E175",
+  E190: "Embraer E190",
+  E195: "Embraer E195",
+  E50P: "Embraer E50",
+  E545: "Embraer Legacy 450",
+  E55P: "Embraer Legacy 500",
+  
+  // ATR turboprops
+  AT42: "ATR 42",
+  AT45: "ATR 45",
+  AT72: "ATR 72",
+  AT73: "ATR 73",
+  AT7F: "ATR 72-600",
+  
+  // Airbus Helicopters (AS/EC/H series)
+  AS65: "Airbus Helicopters AS365",
+  
+  // Sikorsky helicopters
+  S76: "Sikorsky S-76",
+  S92: "Sikorsky S-92",
+  
+  // Regional aircraft manufacturers
+  F900: "Falcon 900",
+  FA7X: "Falcon 7X",
+  FA8X: "Falcon 8X",
+  GLF4: "Gulfstream G450",
+  GLF5: "Gulfstream G550",
+  GLF6: "Gulfstream G650",
+  
+  // Private/Business jets
+  C25B: "Cessna Citation X",
+  C550: "Cessna Citation II",
+  C560: "Cessna Citation V",
+  C650: "Cessna Citation VII",
+  
+  // Utility aircraft
+  SWIFT: "Swift Air",
+  DHC6: "De Havilland DHC-6",
+};
+
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_PAGE_LIMIT = 100;
 const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
@@ -358,6 +470,20 @@ function normalizeFlights(flights, type, airportLookup) {
         (flight.aircraft && (flight.aircraft.registration || flight.aircraft.icao24)) ||
         (flight.flight && (flight.flight.icao || flight.flight.iata)) ||
         "Unknown",
+      aircraftModel: (() => {
+        // Option 1: Try to get model from AviationStack if available
+        if (flight.aircraft) {
+          if (flight.aircraft.model_code) {
+            const modelCode = normalizeCode(flight.aircraft.model_code);
+            return aircraftModelLookup[modelCode] || null;
+          }
+          if (flight.aircraft.icao24) {
+            const icao24 = normalizeCode(flight.aircraft.icao24);
+            return aircraftModelLookup[icao24] || null;
+          }
+        }
+        return null;
+      })(),
       departureIata:
         normalizeCode(flight && flight.departure && flight.departure.iata) ||
         (departureMeta && departureMeta.iata) ||
