@@ -299,7 +299,7 @@ _**Agent (copilot/auto)**_
 - content:
 
 ```
-AVIATIONSTACK_API_KEY=your_aviationstack_key_here
+AVIATIONSTACK_API_KEY=[REDACTED]
 AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
 MONGODB_URI=your_mongodb_connection_string_here
 MONGODB_DB_NAME=planesight
@@ -1396,7 +1396,7 @@ _**Agent (copilot/auto)**_
 +3. Add your AviationStack key later:
 +
 +   ```env
-+   AVIATIONSTACK_API_KEY=your_real_key_here
++   AVIATIONSTACK_API_KEY=[REDACTED]
 +   ```
 +
 +4. Start the app:
@@ -3232,7 +3232,7 @@ _**Agent (copilot/auto)**_
  }
 *** Update File: c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.example
 @@
- AVIATIONSTACK_API_KEY=your_aviationstack_key_here
+ AVIATIONSTACK_API_KEY=[REDACTED]
  AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
  MONGODB_URI=your_mongodb_connection_string_here
  MONGODB_DB_NAME=planesight
@@ -3485,7 +3485,7 @@ _**Agent (copilot/auto)**_
  }
 *** Update File: c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.example
 @@
- AVIATIONSTACK_API_KEY=your_aviationstack_key_here
+ AVIATIONSTACK_API_KEY=[REDACTED]
  AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
  MONGODB_URI=your_mongodb_connection_string_here
  MONGODB_DB_NAME=planesight
@@ -4224,7 +4224,7 @@ Put it in:
 
 Add this line (with your real key):
 
-- `AVIATIONSTACK_API_KEY=your_real_key_here`
+- `AVIATIONSTACK_API_KEY=[REDACTED]`
 
 If `.env.local` does not exist yet, create it in the project root (same level as [package.json](package.json) and [server.js](server.js)).
 
@@ -4234,7 +4234,7 @@ Then restart the server (`npm run dev` or `npm run start`).
 
 _**User (2026-03-17 18:07:14Z)**_
 
-can you put the AVIATIONSTACK_API_KEY=your_real_key_here in for me
+can you put the AVIATIONSTACK_API_KEY=[REDACTED] in for me
 
 ---
 
@@ -4279,7 +4279,7 @@ _**Agent (copilot/auto)**_
 - content:
 
 ```
-AVIATIONSTACK_API_KEY=your_real_key_here
+AVIATIONSTACK_API_KEY=[REDACTED]
 AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
 MONGODB_URI=your_mongodb_connection_string_here
 MONGODB_DB_NAME=planesight
@@ -4359,7 +4359,7 @@ _**Agent (copilot/auto)**_
 
 **Input:**
 
-- command: `Set-Location "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight"; $line = Select-String -Path ".env.local" -Pattern "^AVIATIONSTACK_API_KEY=" | Select-Object -First 1; if (-not $line) { "MISSING_KEY_LINE" } elseif ($line.Line -match "your_real_key_here|your_aviationstack_key_here") { "PLACEHOLDER_KEY_DETECTED" } else { "KEY_LINE_PRESENT_NON_PLACEHOLDER" }`
+- command: `Set-Location "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight"; $line = Select-String -Path ".env.local" -Pattern "^AVIATIONSTACK_API_KEY=[REDACTED] | Select-Object -First 1; if (-not $line) { "MISSING_KEY_LINE" } elseif ($line.Line -match "your_real_key_here|your_aviationstack_key_here") { "PLACEHOLDER_KEY_DETECTED" } else { "KEY_LINE_PRESENT_NON_PLACEHOLDER" }`
 - explanation: `Check whether the local API key line is still a placeholder without printing the secret value.`
 - isBackground: `false`
 
@@ -4405,7 +4405,7 @@ _**Agent (copilot/auto)**_
 
 **Input:**
 
-- command: `Set-Location "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight"; $line = (Get-Content .env.local | Where-Object { $_ -match '^AVIATIONSTACK_API_KEY=' } | Select-Object -First 1); if (-not $line) { 'MISSING_KEY_LINE'; exit 0 }; $value = $line.Substring('AVIATIONSTACK_API_KEY='.Length); [PSCustomObject]@{ hasQuotes=($value.StartsWith('"') -or $value.EndsWith('"') -or $value.StartsWith("'") -or $value.EndsWith("'")); hasLeadingOrTrailingSpaces=($value -ne $value.Trim()); length=$value.Trim().Length; containsPlaceholder=($value -match 'your_real_key_here|your_aviationstack_key_here') } | Format-List`
+- command: `Set-Location "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight"; $line = (Get-Content .env.local | Where-Object { $_ -match '^AVIATIONSTACK_API_KEY=[REDACTED] } | Select-Object -First 1); if (-not $line) { 'MISSING_KEY_LINE'; exit 0 }; $value = $line.Substring('AVIATIONSTACK_API_KEY=[REDACTED] [PSCustomObject]@{ hasQuotes=($value.StartsWith('"') -or $value.EndsWith('"') -or $value.StartsWith("'") -or $value.EndsWith("'")); hasLeadingOrTrailingSpaces=($value -ne $value.Trim()); length=$value.Trim().Length; containsPlaceholder=($value -match 'your_real_key_here|your_aviationstack_key_here') } | Format-List`
 - explanation: `Check the AVIATIONSTACK_API_KEY entry format safely without displaying the key value.`
 - isBackground: `false`
 
@@ -4486,7 +4486,7 @@ _**Agent (copilot/auto)**_
 
 **Input:**
 
-- command: `$url = "http://api.aviationstack.com/v1/flights?access_key=dfeaeeae54f5267fb8709b36c30378d4&limit=1"; try { (Invoke-RestMethod -Uri $url -Method Get) | ConvertTo-Json -Depth 6 } catch { $_.ErrorDetails.Message }`
+- command: `$url = "http://api.aviationstack.com/v1/flights?access_key=[REDACTED]&limit=1"; try { (Invoke-RestMethod -Uri $url -Method Get) | ConvertTo-Json -Depth 6 } catch { $_.ErrorDetails.Message }`
 - explanation: `Send a direct request to AviationStack to see the provider's raw authentication response.`
 - isBackground: `false`
 
@@ -4587,7 +4587,7 @@ _**Agent (copilot/auto)**_
 
 **Input:**
 
-- command: `$envFile = "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.local"; $line = Get-Content $envFile | Where-Object { $_ -match '^AVIATIONSTACK_API_KEY=' } | Select-Object -First 1; if($line){ $val = $line.Substring('AVIATIONSTACK_API_KEY='.Length); [PSCustomObject]@{ prefix=$val.Substring(0,[Math]::Min(4,$val.Length)); len=$val.Length } | Format-List } else { 'KEY_LINE_NOT_FOUND' }`
+- command: `$envFile = "c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.local"; $line = Get-Content $envFile | Where-Object { $_ -match '^AVIATIONSTACK_API_KEY=[REDACTED] } | Select-Object -First 1; if($line){ $val = $line.Substring('AVIATIONSTACK_API_KEY=[REDACTED] [PSCustomObject]@{ prefix=$val.Substring(0,[Math]::Min(4,$val.Length)); len=$val.Length } | Format-List } else { 'KEY_LINE_NOT_FOUND' }`
 - explanation: `Confirm key value characteristics from the exact project .env.local file by absolute path.`
 - isBackground: `false`
 
@@ -4607,8 +4607,8 @@ _**Agent (copilot/auto)**_
 *** Begin Patch
 *** Update File: c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.local
 @@
--AVIATIONSTACK_API_KEY=your_real_key_here
-+AVIATIONSTACK_API_KEY=----------------------------
+-AVIATIONSTACK_API_KEY=[REDACTED]
++AVIATIONSTACK_API_KEY=[REDACTED]
 *** End Patch
 ```
 
@@ -7939,8 +7939,8 @@ _**Agent (copilot/auto)**_
 *** Begin Patch
 *** Update File: c:\Users\evans\OneDrive\Documents\GitHub\PlaneSight\.env.local
 @@
--AVIATIONSTACK_API_KEY=----------------------------
-+AVIATIONSTACK_API_KEY=----------------------------
+-AVIATIONSTACK_API_KEY=[REDACTED]
++AVIATIONSTACK_API_KEY=[REDACTED]
  AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
  MONGODB_URI=your_mongodb_connection_string_here
  MONGODB_DB_NAME=planesight
@@ -7993,7 +7993,7 @@ _**Agent (copilot/auto)**_
 - content:
 
 ```
-AVIATIONSTACK_API_KEY=----------------------------
+AVIATIONSTACK_API_KEY=[REDACTED]
 AVIATIONSTACK_BASE_URL=http://api.aviationstack.com
 MONGODB_URI=your_mongodb_connection_string_here
 MONGODB_DB_NAME=planesight
@@ -8051,7 +8051,7 @@ _**Agent (copilot/auto)**_
 
 **Input:**
 
-- command: `$env:AVIATIONSTACK_API_KEY='----------------------------'; node -e "const u=new URL('/v1/flights','http://api.aviationstack.com'); u.searchParams.set('access_key', process.env.AVIATIONSTACK_API_KEY); u.searchParams.set('arr_iata','YYZ'); u.searchParams.set('limit','1'); fetch(u.toString()).then(async r=>{const j=await r.json(); if(j.error){console.log('error', j.error.code, j.error.message);} else {console.log('ok', j.pagination && j.pagination.count);} }).catch(e=>console.error(e));"`
+- command: `$env:AVIATIONSTACK_API_KEY=[REDACTED] node -e "const u=new URL('/v1/flights','http://api.aviationstack.com'); u.searchParams.set('access_key', process.env.AVIATIONSTACK_API_KEY); u.searchParams.set('arr_iata','YYZ'); u.searchParams.set('limit','1'); fetch(u.toString()).then(async r=>{const j=await r.json(); if(j.error){console.log('error', j.error.code, j.error.message);} else {console.log('ok', j.pagination && j.pagination.count);} }).catch(e=>console.error(e));"`
 - explanation: `Validate the provided new key directly by forcing it in the process environment`
 - isBackground: `false`
 
