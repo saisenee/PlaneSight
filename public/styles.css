@@ -39,6 +39,22 @@ body {
   overflow-x: hidden;
 }
 
+body.airport-gate-active .hero-scroll-section,
+body.airport-gate-active #statusSection,
+body.airport-gate-active #visualsSection,
+body.airport-gate-active #boardsSection,
+body.airport-gate-active #footerSection,
+body.airport-gate-active .page-progress,
+body.airport-gate-active .refresh-floating,
+body.airport-gate-active .bottom-veil,
+body.airport-gate-active #apiUnauthorizedFlag {
+  display: none;
+}
+
+body.airport-gate-active .page-shell {
+  padding-bottom: 56px;
+}
+
 button,
 input,
 select,
@@ -275,6 +291,183 @@ code {
 
 .visuals-intro {
   padding-bottom: 18px;
+}
+
+.airport-selector-panel {
+  padding-bottom: 24px;
+}
+
+.airport-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0 24px 24px;
+}
+
+.airport-option {
+  border: 1px solid rgba(186, 216, 245, 0.26);
+  border-radius: 18px;
+  padding: 0;
+  background: rgba(5, 20, 76, 0.72);
+  color: var(--foreground);
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.airport-option[disabled] {
+  pointer-events: none;
+}
+
+.airport-option:disabled {
+  cursor: default;
+}
+
+.airport-option:hover,
+.airport-option:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(119, 214, 255, 0.68);
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(101, 196, 255, 0.18);
+  outline: none;
+}
+
+.airport-option.is-active {
+  border-color: rgba(142, 230, 255, 0.92);
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(127, 214, 255, 0.28),
+    0 0 26px rgba(86, 204, 242, 0.2);
+}
+
+.airport-option--coming-soon {
+  opacity: 0.58;
+  filter: saturate(0.65) grayscale(0.08);
+}
+
+.airport-option--coming-soon .airport-option__image {
+  filter: saturate(0.55) contrast(0.96);
+}
+
+.airport-option--coming-soon .airport-option__body {
+  position: relative;
+}
+
+.airport-option__badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 19, 43, 0.78);
+  border: 1px solid rgba(213, 228, 246, 0.24);
+  color: rgba(244, 248, 255, 0.88);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.airport-option__image {
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.9) contrast(1.02);
+}
+
+.airport-option__body {
+  display: grid;
+  gap: 12px;
+  padding: 22px 22px 24px;
+  background: linear-gradient(180deg, rgba(8, 24, 82, 0.86), rgba(5, 18, 60, 0.96));
+}
+
+.airport-option__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.airport-option__code {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(86, 204, 242, 0.14);
+  border: 1px solid rgba(144, 222, 255, 0.34);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.airport-option__logo {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
+}
+
+.airport-option__body strong {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.airport-option__body span {
+  color: rgba(220, 233, 248, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.airport-choice-prompt {
+  margin: 4px 24px 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(143, 214, 255, 0.46);
+  background: linear-gradient(180deg, rgba(17, 44, 116, 0.82), rgba(7, 26, 78, 0.94));
+  color: #e9f4ff;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  text-align: center;
+  animation: airport-choice-pulse 1.8s ease-in-out infinite;
+}
+
+.airport-choice-prompt strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.airport-choice-prompt span {
+  font-size: 0.82rem;
+  color: rgba(214, 231, 250, 0.86);
+}
+
+@keyframes airport-choice-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(86, 204, 242, 0.05);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(86, 204, 242, 0.22);
+    transform: translateY(-1px);
+  }
 }
 
 .landing {
@@ -1299,6 +1492,15 @@ p {
 
   .selected-flight-grid {
     grid-template-columns: 1fr;
+  }
+
+  .airport-selector-grid {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+
+  .airport-choice-prompt {
+    margin: 0 16px;
   }
 
   .hero-scroll-section {

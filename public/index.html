@@ -7,7 +7,7 @@
     
     <meta
       name="description"
-      content="Live Toronto Pearson Airport flight dashboard using AviationStack."
+      content="Live airport flight dashboard using AviationStack."
     />
     <link rel="icon" type="image/png" href="/img/planeicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -41,7 +41,96 @@
           <p class="landing__subtitle">an Airport Data Visualization Dashboard</p>
           <p class="landing__credits">Created by Evan Saisenesouk &nbsp;&nbsp; Powered by AviationStack and Github Copilot</p>
 
-          <a class="button landing__cta" href="#pearsonTitle">Enter dashboard</a>
+          <a class="button landing__cta" href="#airportSelectorSection">Choose airport</a>
+        </div>
+      </section>
+
+      <section id="airportSelectorSection" class="panel airport-selector-panel reveal-section" aria-label="Airport selector">
+        <div class="panel-header">
+          <div>
+            <h2>Select an Airport</h2>
+            <p>Pick one airport to unlock the dashboard. The teaser options below are disabled for now.</p>
+          </div>
+          <span class="panel-pill">Choose first</span>
+        </div>
+
+        <div class="airport-selector-grid">
+          <button
+            class="airport-option"
+            type="button"
+            data-airport-code="YYZ"
+            aria-pressed="false"
+          >
+            <img class="airport-option__image" src="img/pearson.jpg" alt="Toronto Pearson airport terminal" />
+            <div class="airport-option__body">
+              <div class="airport-option__topline">
+                <span class="airport-option__code">YYZ</span>
+                <img class="airport-option__logo" src="img/pearsonlogo.png" alt="Toronto Pearson logo" />
+              </div>
+              <strong>Toronto Pearson</strong>
+              <span>Lester B. Pearson International Airport</span>
+            </div>
+          </button>
+
+          <button
+            class="airport-option"
+            type="button"
+            data-airport-code="CLT"
+            aria-pressed="false"
+          >
+            <img class="airport-option__image" src="img/CLT_IMG.png" alt="Charlotte Douglas International Airport" />
+            <div class="airport-option__body">
+              <div class="airport-option__topline">
+                <span class="airport-option__code">CLT</span>
+                <img class="airport-option__logo" src="img/Charlotte_Douglas_International_Airport_logo.svg.png" alt="Charlotte Douglas International Airport logo" />
+              </div>
+              <strong>Charlotte Douglas</strong>
+              <span>Charlotte Douglas International Airport</span>
+            </div>
+          </button>
+
+          <button
+            class="airport-option airport-option--coming-soon"
+            type="button"
+            disabled
+            aria-disabled="true"
+            tabindex="-1"
+          >
+            <img class="airport-option__image" src="img/vancouver%20img.png" alt="Vancouver International Airport" />
+            <div class="airport-option__badge">Coming Soon</div>
+            <div class="airport-option__body">
+              <div class="airport-option__topline">
+                <span class="airport-option__code">YVR</span>
+                <img class="airport-option__logo" src="img/YVR%20Logo.png" alt="Vancouver International Airport logo" />
+              </div>
+              <strong>Vancouver</strong>
+              <span>Vancouver International Airport</span>
+            </div>
+          </button>
+
+          <button
+            class="airport-option airport-option--coming-soon"
+            type="button"
+            disabled
+            aria-disabled="true"
+            tabindex="-1"
+          >
+            <img class="airport-option__image" src="img/Los%20Angeles%20img.png" alt="Los Angeles International Airport" />
+            <div class="airport-option__badge">Coming Soon</div>
+            <div class="airport-option__body">
+              <div class="airport-option__topline">
+                <span class="airport-option__code">LAX</span>
+                <img class="airport-option__logo" src="img/LAX%20logo.png" alt="Los Angeles International Airport logo" />
+              </div>
+              <strong>Los Angeles</strong>
+              <span>Los Angeles International Airport</span>
+            </div>
+          </button>
+        </div>
+
+        <div id="airportChoicePrompt" class="airport-choice-prompt" role="status" aria-live="polite">
+          <strong>Choose YYZ or CLT to continue</strong>
+          <span>The dashboard unlocks after your selection.</span>
         </div>
       </section>
 
@@ -58,23 +147,24 @@
 
           <div class="hero-destination">
             <div class="hero-destination-top">
-              <span class="hero-yyz">YYZ</span>
-              <img src="img/pearsonlogo.png" alt="Toronto Pearson logo" class="hero-pearson-logo" />
+              <span id="heroAirportCode" class="hero-yyz">YYZ</span>
+              <img id="heroAirportLogo" src="img/pearsonlogo.png" alt="Toronto Pearson logo" class="hero-pearson-logo" />
             </div>
             <div class="hero-destination-content">
               <div id="airportDataSection" class="hero-destination-copy">
                 <span class="eyebrow">Airport Data</span>
-                <h1 id="pearsonTitle">Toronto Pearson Airport</h1>
-                <p class="hero-airport-name">Lester B. Pearson International Airport (YYZ)</p>
-                <p>Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.
+                <h1 id="airportTitle">Toronto Pearson Airport</h1>
+                <p id="heroAirportName" class="hero-airport-name">Lester B. Pearson International Airport (YYZ)</p>
+                <p id="heroAirportBlurb">Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.
                 </p>
                 <div class="hero-actions">
-                  <a class="button button-ghost" href="https://www.torontopearson.com/en" target="_blank" rel="noopener noreferrer">Visit Site</a>
+                  <a id="heroAirportVisitButton" class="button button-ghost" href="https://www.torontopearson.com/en" target="_blank" rel="noopener noreferrer">Visit Site</a>
                 </div>
               </div>
 
               <div class="hero-airport-visual" aria-hidden="true">
                 <img
+                  id="heroAirportPhoto"
                   src="img/pearson.jpg"
                   alt="Toronto Pearson airport terminal"
                   class="hero-airport-photo"

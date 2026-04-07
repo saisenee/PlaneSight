@@ -14,6 +14,7 @@ const statusColorMap = {
 
 const airportCoordinateByIata = {
   YYZ: { lat: 43.6777, lon: -79.6248 },
+  CLT: { lat: 35.214, lon: -80.9431 },
   YUL: { lat: 45.4706, lon: -73.7408 },
   YOW: { lat: 45.3225, lon: -75.6692 },
   YWG: { lat: 49.9099, lon: -97.2399 },
@@ -73,6 +74,7 @@ const airportCoordinateByIata = {
 
 const airportCountryByIata = {
   YYZ: "CA",
+  CLT: "US",
   YUL: "CA",
   YOW: "CA",
   YWG: "CA",
@@ -130,6 +132,44 @@ const airportCountryByIata = {
   MEX: "MX",
 };
 
+const airportDefinitions = {
+  YYZ: {
+    code: "YYZ",
+    title: "Toronto Pearson Airport",
+    displayName: "Lester B. Pearson International Airport (YYZ)",
+    blurb:
+      "Canada's largest and busiest airport serving millions of passengers annually since 1938. Located in Mississauga, it serves the Greater Toronto Area with two terminals (1 and 3) and five runways. It connects to roughly 200 destinations and acts as a major economic hub.",
+    logoSrc: "img/pearsonlogo.png",
+    logoAlt: "Toronto Pearson logo",
+    photoSrc: "img/pearson.jpg",
+    photoAlt: "Toronto Pearson airport terminal",
+    siteUrl: "https://www.torontopearson.com/en",
+    siteLabel: "Visit Site",
+  },
+  CLT: {
+    code: "CLT",
+    title: "Charlotte Douglas International Airport",
+    displayName: "Charlotte Douglas International Airport (CLT)",
+    blurb:
+      "Charlotte Douglas International Airport is an international airport serving Charlotte, North Carolina, United States, located roughly six miles west of the city's central business district. Charlotte Douglas is the primary airport for commercial and military use in the Charlotte metropolitan area.",
+    logoSrc: "img/Charlotte_Douglas_International_Airport_logo.svg.png",
+    logoAlt: "Charlotte Douglas International Airport logo",
+    photoSrc: "img/CLT_IMG.png",
+    photoAlt: "Charlotte Douglas International Airport",
+    siteUrl: "https://www.cltairport.com/",
+    siteLabel: "Visit Site",
+  },
+};
+
+const airportHeroImageSets = {
+  YYZ: [
+    "img/pearson.jpg",
+    "img/Airport2.avif",
+    "img/Airport3.jpg",
+  ],
+  CLT: ["img/CLT_IMG.png"],
+};
+
 let topRoutesChart;
 let hourlyClockChart;
 let domesticMixChart;
@@ -153,10 +193,23 @@ const flightMarkersById = new Map();
 let mapTheme = window.localStorage.getItem("planesight-map-theme") === "light"
   ? "light"
   : "dark";
+let activeAirportCode = null;
+const airportSnapshotCache = new Map();
+let airportPhotoIntervalId = null;
+let airportPhotoElements = null;
 
 const elements = {
+  airportSelectorButtons: document.querySelectorAll("[data-airport-code]"),
+  airportChoicePrompt: document.getElementById("airportChoicePrompt"),
   refreshButton: document.getElementById("refreshButton"),
   lastUpdatedText: document.getElementById("lastUpdatedText"),
+  heroAirportCode: document.getElementById("heroAirportCode"),
+  heroAirportLogo: document.getElementById("heroAirportLogo"),
+  heroAirportTitle: document.getElementById("airportTitle"),
+  heroAirportName: document.getElementById("heroAirportName"),
+  heroAirportBlurb: document.getElementById("heroAirportBlurb"),
+  heroAirportVisitButton: document.getElementById("heroAirportVisitButton"),
+  heroAirportPhoto: document.getElementById("heroAirportPhoto"),
   arrivalsCount: document.getElementById("arrivalsCount"),
   departuresCount: document.getElementById("departuresCount"),
   liveCount: document.getElementById("liveCount"),
@@ -182,6 +235,304 @@ const elements = {
   mapThemeToggle: document.getElementById("mapThemeToggle"),
   apiUnauthorizedFlag: document.getElementById("apiUnauthorizedFlag"),
 };
+
+function normalizeAirportCode(value) {
+  const code = String(value || "").trim().toUpperCase();
+  return airportDefinitions[code] ? code : "YYZ";
+}
+
+function getAirportDefinition(airportCode = activeAirportCode) {
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+  return airportDefinitions[normalizedAirportCode] || airportDefinitions.YYZ;
+}
+
+function updateAirportSelectorState(airportCode) {
+  const normalized = normalizeAirportCode(airportCode);
+
+  elements.airportSelectorButtons.forEach((button) => {
+    const isActive = button.dataset.airportCode === normalized;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function setAirportGateActive(isActive) {
+  document.body.classList.toggle("airport-gate-active", isActive);
+
+  if (elements.airportChoicePrompt) {
+    elements.airportChoicePrompt.classList.toggle("hidden", !isActive);
+  }
+}
+
+function unlockAirportGate() {
+  setAirportGateActive(false);
+}
+
+function lockAirportGate() {
+  setAirportGateActive(true);
+}
+
+function hideAirportDataShell() {
+  latestArrivals = [];
+  latestDepartures = [];
+  latestFlights = [];
+  latestArrivalTotal = 0;
+  latestDepartureTotal = 0;
+  if (elements.heroAirportCode) {
+    elements.heroAirportCode.textContent = "—";
+  }
+  if (elements.heroAirportTitle) {
+    elements.heroAirportTitle.textContent = "Choose an airport to begin";
+  }
+  if (elements.heroAirportName) {
+    elements.heroAirportName.textContent = "YYZ and CLT are available now, with LAX and YVR coming soon.";
+  }
+  if (elements.heroAirportBlurb) {
+    elements.heroAirportBlurb.textContent = "Select one of the active airport cards above to unlock the dashboard and load its cached live data.";
+  }
+  if (elements.heroAirportVisitButton) {
+    elements.heroAirportVisitButton.href = "#airportSelectorSection";
+    elements.heroAirportVisitButton.textContent = "Choose airport";
+  }
+  if (elements.heroAirportLogo) {
+    elements.heroAirportLogo.removeAttribute("src");
+  }
+  if (elements.heroAirportPhoto) {
+    elements.heroAirportPhoto.removeAttribute("src");
+  }
+  if (elements.arrivalsCount) {
+    elements.arrivalsCount.textContent = "0";
+  }
+  if (elements.departuresCount) {
+    elements.departuresCount.textContent = "0";
+  }
+  if (elements.liveCount) {
+    elements.liveCount.textContent = "0";
+  }
+  if (elements.arrivalsPill) {
+    elements.arrivalsPill.textContent = "Locked";
+  }
+  if (elements.departuresPill) {
+    elements.departuresPill.textContent = "Locked";
+  }
+  showNotice("Choose YYZ or CLT to load the dashboard.");
+  updateUnauthorizedFlag("");
+}
+
+function updateAirportShell(airportCode) {
+  const airport = getAirportDefinition(airportCode);
+  const descriptionMeta = document.querySelector('meta[name="description"]');
+
+  activeAirportCode = airport.code;
+  unlockAirportGate();
+
+  if (descriptionMeta) {
+    descriptionMeta.setAttribute(
+      "content",
+      `Live ${airport.title} flight dashboard using AviationStack.`,
+    );
+  }
+
+  document.title = `PlaneSight | ${airport.code} | ${airport.title}`;
+
+  if (elements.heroAirportCode) {
+    elements.heroAirportCode.textContent = airport.code;
+  }
+
+  if (elements.heroAirportLogo) {
+    elements.heroAirportLogo.src = airport.logoSrc;
+    elements.heroAirportLogo.alt = airport.logoAlt;
+  }
+
+  if (elements.heroAirportTitle) {
+    elements.heroAirportTitle.textContent = airport.title;
+  }
+
+  if (elements.heroAirportName) {
+    elements.heroAirportName.textContent = airport.displayName;
+  }
+
+  if (elements.heroAirportBlurb) {
+    elements.heroAirportBlurb.textContent = airport.blurb;
+  }
+
+  if (elements.heroAirportVisitButton) {
+    elements.heroAirportVisitButton.href = airport.siteUrl;
+    elements.heroAirportVisitButton.textContent = airport.siteLabel;
+  }
+
+  if (elements.heroAirportPhoto) {
+    elements.heroAirportPhoto.src = airport.photoSrc;
+    elements.heroAirportPhoto.alt = airport.photoAlt;
+  }
+
+  configureAirportPhotoRotation(airport.code);
+
+  const statusDetails = document.querySelectorAll("#statusSection .status-card-detail");
+  if (statusDetails[0]) {
+    statusDetails[0].textContent = `Total arrivals available for ${airport.code}`;
+  }
+  if (statusDetails[1]) {
+    statusDetails[1].textContent = `Total departures available for ${airport.code}`;
+  }
+
+  const routesHeading = document.querySelector("#topRoutesSection h3");
+  const routesDescription = document.querySelector("#topRoutesSection p");
+  if (routesHeading) {
+    routesHeading.textContent = `Top Routes to/from ${airport.code}`;
+  }
+  if (routesDescription) {
+    routesDescription.textContent = `Most frequent origin/destination pairs from the current live ${airport.code} feed.`;
+  }
+
+  const hourlyHeading = document.querySelector("#hourlyClockSection h3");
+  const hourlyDescription = document.querySelector("#hourlyClockSection p");
+  if (hourlyHeading) {
+    hourlyHeading.textContent = "24-Hour Flight Clock";
+  }
+  if (hourlyDescription) {
+    hourlyDescription.textContent = `Flight density by scheduled hour to show daily traffic wave patterns for ${airport.code}.`;
+  }
+
+  const domesticHeading = document.querySelector("#domesticMixSection h3");
+  const domesticDescription = document.querySelector("#domesticMixSection p");
+  if (domesticHeading) {
+    domesticHeading.textContent = "Domestic vs International";
+  }
+  if (domesticDescription) {
+    domesticDescription.textContent = `Share of ${airport.code} flights that are within Canada versus outside Canada.`;
+  }
+
+  const arrivalsHeading = document.querySelector("#arrivalsSection h2");
+  const arrivalsDescription = document.querySelector("#arrivalsSection .panel-header p");
+  if (arrivalsHeading) {
+    arrivalsHeading.textContent = `Arrivals to ${airport.code}`;
+  }
+  if (arrivalsDescription) {
+    arrivalsDescription.textContent = `Latest inbound flights returned by AviationStack for ${airport.code}.`;
+  }
+
+  const departuresHeading = document.querySelector("#departuresSection h2");
+  const departuresDescription = document.querySelector("#departuresSection .panel-header p");
+  if (departuresHeading) {
+    departuresHeading.textContent = `Departures from ${airport.code}`;
+  }
+  if (departuresDescription) {
+    departuresDescription.textContent = `Latest outbound flights returned by AviationStack for ${airport.code}.`;
+  }
+
+  const routeLegendItems = document.querySelectorAll(".route-legend span");
+  if (routeLegendItems[0]?.childNodes[1]) {
+    routeLegendItems[0].childNodes[1].nodeValue = `To ${airport.code} (arrivals)`;
+  }
+  if (routeLegendItems[1]?.childNodes[1]) {
+    routeLegendItems[1].childNodes[1].nodeValue = `From ${airport.code} (departures)`;
+  }
+
+  updateAirportSelectorState(airport.code);
+}
+
+function setAirportPhotoSource(src) {
+  if (!airportPhotoElements) {
+    return;
+  }
+
+  airportPhotoElements.base.setAttribute("src", src);
+  airportPhotoElements.overlay.setAttribute("src", src);
+  airportPhotoElements.base.classList.remove("is-hidden");
+  airportPhotoElements.overlay.classList.add("is-hidden");
+  airportPhotoElements.showingOverlay = false;
+}
+
+function configureAirportPhotoRotation(airportCode) {
+  if (!airportPhotoElements) {
+    return;
+  }
+
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+  const imageSources = airportHeroImageSets[normalizedAirportCode] || airportHeroImageSets.YYZ;
+
+  if (airportPhotoIntervalId) {
+    window.clearInterval(airportPhotoIntervalId);
+    airportPhotoIntervalId = null;
+  }
+
+  imageSources.forEach((src) => {
+    const preload = new Image();
+    preload.src = src;
+  });
+
+  if (imageSources.length <= 1) {
+    setAirportPhotoSource(imageSources[0]);
+    return;
+  }
+
+  let activeIndex = imageSources.findIndex((src) => (
+    (airportPhotoElements.base.getAttribute("src") || "").includes(src)
+  ));
+
+  if (activeIndex < 0) {
+    activeIndex = 0;
+    setAirportPhotoSource(imageSources[0]);
+  }
+
+  function crossfadeTo(nextSrc) {
+    const incoming = airportPhotoElements.showingOverlay
+      ? airportPhotoElements.base
+      : airportPhotoElements.overlay;
+    const outgoing = airportPhotoElements.showingOverlay
+      ? airportPhotoElements.overlay
+      : airportPhotoElements.base;
+
+    incoming.setAttribute("src", nextSrc);
+    incoming.classList.remove("is-hidden");
+    outgoing.classList.add("is-hidden");
+    airportPhotoElements.showingOverlay = !airportPhotoElements.showingOverlay;
+  }
+
+  airportPhotoIntervalId = window.setInterval(() => {
+    activeIndex = (activeIndex + 1) % imageSources.length;
+    crossfadeTo(imageSources[activeIndex]);
+  }, 3000);
+}
+
+function applyAirportSnapshot(snapshot) {
+  latestArrivals = snapshot.arrivals.map((flight) => ({
+    ...flight,
+    direction: "arrival",
+  }));
+  latestDepartures = snapshot.departures.map((flight) => ({
+    ...flight,
+    direction: "departure",
+  }));
+
+  latestArrivalTotal = Number.isFinite(Number(snapshot.arrivalTotal))
+    ? Number(snapshot.arrivalTotal)
+    : latestArrivals.length;
+  latestDepartureTotal = Number.isFinite(Number(snapshot.departureTotal))
+    ? Number(snapshot.departureTotal)
+    : latestDepartures.length;
+
+  latestFlights = [...latestArrivals, ...latestDepartures];
+  updateAirportShell(snapshot.airportCode);
+
+  const message = snapshot.message || (snapshot.placeholder
+    ? "Set AVIATIONSTACK_API_KEY to load live AviationStack data."
+    : "");
+
+  showNotice(message);
+  updateUnauthorizedFlag(message);
+
+  if (
+    message
+    && (message.toLowerCase().includes("rate limit")
+      || message.toLowerCase().includes("currently frozen"))
+  ) {
+    pauseAutoPollingForRateLimit();
+  }
+
+  updateFilteredView();
+}
 
 // Hero scroll animation
 function initHeroScrollAnimation() {
@@ -476,46 +827,20 @@ function initAirportPhotoRotator() {
     return;
   }
 
-  const imageSources = [
-    "img/pearson.jpg",
-    "img/Airport2.avif",
-    "img/Airport3.jpg",
-  ];
-
-  imageSources.forEach((src) => {
-    const preload = new Image();
-    preload.src = src;
-  });
-
-  let activeIndex = imageSources.findIndex((src) => (airportPhoto.getAttribute("src") || "").includes(src));
-
-  if (activeIndex < 0) {
-    activeIndex = 0;
-    airportPhoto.setAttribute("src", imageSources[0]);
-  }
-
   const overlayPhoto = airportPhoto.cloneNode(true);
   overlayPhoto.classList.add("hero-airport-photo--overlay", "is-hidden");
+  overlayPhoto.removeAttribute("id");
   overlayPhoto.setAttribute("alt", "");
   overlayPhoto.setAttribute("aria-hidden", "true");
   airportVisual.appendChild(overlayPhoto);
 
-  let showingOverlay = false;
+  airportPhotoElements = {
+    base: airportPhoto,
+    overlay: overlayPhoto,
+    showingOverlay: false,
+  };
 
-  function crossfadeTo(nextSrc) {
-    const incoming = showingOverlay ? airportPhoto : overlayPhoto;
-    const outgoing = showingOverlay ? overlayPhoto : airportPhoto;
-
-    incoming.setAttribute("src", nextSrc);
-    incoming.classList.remove("is-hidden");
-    outgoing.classList.add("is-hidden");
-    showingOverlay = !showingOverlay;
-  }
-
-  window.setInterval(() => {
-    activeIndex = (activeIndex + 1) % imageSources.length;
-    crossfadeTo(imageSources[activeIndex]);
-  }, 3000);
+  configureAirportPhotoRotation(activeAirportCode || "YYZ");
 }
 
 function formatTime(value) {
@@ -1683,6 +2008,9 @@ function ensureLeafletConstellation(container) {
 
 function renderConstellationLeaflet(flights) {
   const container = elements.flightConstellation;
+  const activeHubCode = normalizeAirportCode(activeAirportCode);
+  const activeHub = knownAirportCoordinate(activeHubCode);
+  const activeAirport = getAirportDefinition(activeHubCode);
 
   if (!container || !ensureLeafletConstellation(container) || !constellationMap) {
     return false;
@@ -1691,29 +2019,27 @@ function renderConstellationLeaflet(flights) {
   routeLayerGroup.clearLayers();
   markerLayerGroup.clearLayers();
   flightMarkersById.clear();
-  container.querySelectorAll(".yyz-point").forEach((node) => node.remove());
+  container.querySelectorAll(".airport-point").forEach((node) => node.remove());
 
   const boundsPoints = [];
-  const yyzHub = knownAirportCoordinate("YYZ");
-
-  if (yyzHub) {
-    const yyzMarker = window.L.marker([yyzHub.lat, yyzHub.lon], {
+  if (activeHub) {
+    const airportMarker = window.L.marker([activeHub.lat, activeHub.lon], {
       icon: window.L.divIcon({
-        className: "yyz-hub-marker-wrap",
-        html: '<div class="yyz-hub-marker" aria-hidden="true">★</div>',
+        className: "airport-hub-marker-wrap",
+        html: '<div class="airport-hub-marker" aria-hidden="true">★</div>',
         iconSize: [32, 32],
         iconAnchor: [16, 16],
       }),
       zIndexOffset: 1400,
     });
 
-    yyzMarker.bindTooltip("YYZ · Toronto Pearson", {
+    airportMarker.bindTooltip(`${activeHubCode} · ${activeAirport.title}`, {
       direction: "top",
       opacity: 0.96,
     });
 
-    yyzMarker.addTo(markerLayerGroup);
-    boundsPoints.push([yyzHub.lat, yyzHub.lon]);
+    airportMarker.addTo(markerLayerGroup);
+    boundsPoints.push([activeHub.lat, activeHub.lon]);
   }
 
   for (const flight of flights) {
@@ -1781,6 +2107,9 @@ function renderConstellation(flights) {
 
 function renderConstellationFallback(flights) {
   const container = elements.flightConstellation;
+  const activeHubCode = normalizeAirportCode(activeAirportCode);
+  const activeHub = knownAirportCoordinate(activeHubCode);
+  const activeAirport = getAirportDefinition(activeHubCode);
 
   if (!container) {
     return;
@@ -1788,7 +2117,7 @@ function renderConstellationFallback(flights) {
 
   container.querySelectorAll(".flight-point").forEach((node) => node.remove());
   container.querySelectorAll(".route-layer").forEach((node) => node.remove());
-  container.querySelectorAll(".yyz-point").forEach((node) => node.remove());
+  container.querySelectorAll(".airport-point").forEach((node) => node.remove());
   hideFlightTooltip();
 
   const width = container.clientWidth || 900;
@@ -1800,17 +2129,15 @@ function renderConstellationFallback(flights) {
   svg.setAttribute("preserveAspectRatio", "none");
   container.appendChild(svg);
 
-  const yyzHub = knownAirportCoordinate("YYZ");
-
-  if (yyzHub) {
-    const yyzPoint = mapCoordinateToContainer(projectCoordinate(yyzHub.lat, yyzHub.lon), width, height);
+  if (activeHub) {
+    const airportPoint = mapCoordinateToContainer(projectCoordinate(activeHub.lat, activeHub.lon), width, height);
     const hub = document.createElement("div");
-    hub.className = "yyz-point";
+    hub.className = "airport-point";
     hub.textContent = "★";
-    hub.style.left = `${yyzPoint.x}%`;
-    hub.style.top = `${yyzPoint.y}%`;
-    hub.setAttribute("aria-label", "YYZ Toronto Pearson hub");
-    hub.title = "YYZ · Toronto Pearson";
+    hub.style.left = `${airportPoint.x}%`;
+    hub.style.top = `${airportPoint.y}%`;
+    hub.setAttribute("aria-label", `${activeHubCode} ${activeAirport.title} hub`);
+    hub.title = `${activeHubCode} · ${activeAirport.title}`;
     container.appendChild(hub);
   }
 
@@ -2059,7 +2386,8 @@ function pauseAutoPollingForRateLimit() {
 }
 
 async function fetchFlights(type, options = {}) {
-  const query = new URLSearchParams({ type });
+  const airportCode = normalizeAirportCode(options.airportCode || activeAirportCode);
+  const query = new URLSearchParams({ type, airport: airportCode });
 
   if (options.loadAllOnce) {
     query.set("all", "1");
@@ -2078,66 +2406,112 @@ async function fetchFlights(type, options = {}) {
   return data;
 }
 
+async function loadAirportSnapshot(airportCode, options = {}) {
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+  const [arrivals, departures] = await Promise.all([
+    fetchFlights("arrival", {
+      airportCode: normalizedAirportCode,
+      loadAllOnce: Boolean(options.loadAllOnce),
+    }),
+    fetchFlights("departure", {
+      airportCode: normalizedAirportCode,
+      loadAllOnce: Boolean(options.loadAllOnce),
+    }),
+  ]);
+
+  const loadedArrivals = Number.isFinite(Number(arrivals.fetchedCount))
+    ? Number(arrivals.fetchedCount)
+    : arrivals.flights.length;
+  const loadedDepartures = Number.isFinite(Number(departures.fetchedCount))
+    ? Number(departures.fetchedCount)
+    : departures.flights.length;
+
+  const summaryMessage = options.loadAllOnce
+    ? `Loaded ${loadedArrivals} arrivals and ${loadedDepartures} departures in one paginated snapshot.`
+    : "";
+  const upstreamMessage = arrivals.message || departures.message || "";
+  const message = upstreamMessage ? (summaryMessage ? `${summaryMessage} ${upstreamMessage}` : upstreamMessage) : summaryMessage;
+
+  return {
+    airportCode: normalizedAirportCode,
+    arrivals: arrivals.flights || [],
+    departures: departures.flights || [],
+    arrivalTotal: arrivals.totalAvailable,
+    departureTotal: departures.totalAvailable,
+    arrivalFetchedCount: arrivals.fetchedCount,
+    departureFetchedCount: departures.fetchedCount,
+    placeholder: Boolean(arrivals.placeholder || departures.placeholder),
+    message,
+  };
+}
+
+function cacheAirportSnapshot(snapshot) {
+  airportSnapshotCache.set(snapshot.airportCode, snapshot);
+}
+
+function getCachedAirportSnapshot(airportCode) {
+  return airportSnapshotCache.get(normalizeAirportCode(airportCode)) || null;
+}
+
+function createEmptyAirportSnapshot(airportCode, message = "") {
+  return {
+    airportCode: normalizeAirportCode(airportCode),
+    arrivals: [],
+    departures: [],
+    arrivalTotal: 0,
+    departureTotal: 0,
+    placeholder: true,
+    message,
+  };
+}
+
+function selectAirport(airportCode) {
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+  const cachedSnapshot = getCachedAirportSnapshot(normalizedAirportCode);
+
+  if (cachedSnapshot) {
+    applyAirportSnapshot(cachedSnapshot);
+    return;
+  }
+
+  latestArrivals = [];
+  latestDepartures = [];
+  latestFlights = [];
+  latestArrivalTotal = 0;
+  latestDepartureTotal = 0;
+  updateAirportShell(normalizedAirportCode);
+  updateFilteredView();
+}
+
 async function refreshFlights() {
   if (isRefreshing || isLoadingAll) {
     return;
   }
 
+  if (!activeAirportCode) {
+    return;
+  }
+
+  const requestedAirportCode = activeAirportCode;
   isRefreshing = true;
   elements.refreshButton.disabled = true;
-  elements.refreshButton.textContent = "Refreshing…";
+  elements.refreshButton.textContent = `Refreshing ${requestedAirportCode}…`;
 
   try {
-    const [arrivals, departures] = await Promise.all([
-      fetchFlights("arrival"),
-      fetchFlights("departure"),
-    ]);
+    const snapshot = await loadAirportSnapshot(requestedAirportCode);
+    cacheAirportSnapshot(snapshot);
 
-    latestArrivals = arrivals.flights.map((flight) => ({
-      ...flight,
-      direction: "arrival",
-    }));
-    latestDepartures = departures.flights.map((flight) => ({
-      ...flight,
-      direction: "departure",
-    }));
-
-    latestArrivalTotal = Number.isFinite(Number(arrivals.totalAvailable))
-      ? Number(arrivals.totalAvailable)
-      : latestArrivals.length;
-    latestDepartureTotal = Number.isFinite(Number(departures.totalAvailable))
-      ? Number(departures.totalAvailable)
-      : latestDepartures.length;
-
-    latestFlights = [...latestArrivals, ...latestDepartures];
-
-    const message =
-      arrivals.message || departures.message ||
-      (arrivals.placeholder || departures.placeholder
-        ? "Set AVIATIONSTACK_API_KEY to load live AviationStack data."
-        : "");
-
-    showNotice(message);
-    updateUnauthorizedFlag(message);
-
-    if (
-      message
-      && (message.toLowerCase().includes("rate limit")
-        || message.toLowerCase().includes("currently frozen"))
-    ) {
-      pauseAutoPollingForRateLimit();
+    if (requestedAirportCode === activeAirportCode) {
+      applyAirportSnapshot(snapshot);
+      elements.lastUpdatedText.textContent = `Last updated ${new Intl.DateTimeFormat(
+        "en-CA",
+        {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        },
+      ).format(new Date())}`;
     }
-
-    updateFilteredView();
-
-    elements.lastUpdatedText.textContent = `Last updated ${new Intl.DateTimeFormat(
-      "en-CA",
-      {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-      },
-    ).format(new Date())}`;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load flight data.";
     showNotice(message);
@@ -2154,6 +2528,11 @@ async function loadAllFlightsOnce() {
     return;
   }
 
+  if (!activeAirportCode) {
+    return;
+  }
+
+  const requestedAirportCode = activeAirportCode;
   isLoadingAll = true;
   elements.refreshButton.disabled = true;
 
@@ -2163,52 +2542,20 @@ async function loadAllFlightsOnce() {
   }
 
   try {
-    const [arrivals, departures] = await Promise.all([
-      fetchFlights("arrival", { loadAllOnce: true }),
-      fetchFlights("departure", { loadAllOnce: true }),
-    ]);
+    const snapshot = await loadAirportSnapshot(requestedAirportCode, { loadAllOnce: true });
+    cacheAirportSnapshot(snapshot);
 
-    latestArrivals = arrivals.flights.map((flight) => ({
-      ...flight,
-      direction: "arrival",
-    }));
-    latestDepartures = departures.flights.map((flight) => ({
-      ...flight,
-      direction: "departure",
-    }));
-
-    latestArrivalTotal = Number.isFinite(Number(arrivals.totalAvailable))
-      ? Number(arrivals.totalAvailable)
-      : latestArrivals.length;
-    latestDepartureTotal = Number.isFinite(Number(departures.totalAvailable))
-      ? Number(departures.totalAvailable)
-      : latestDepartures.length;
-
-    latestFlights = [...latestArrivals, ...latestDepartures];
-
-    const loadedArrivals = Number.isFinite(Number(arrivals.fetchedCount))
-      ? Number(arrivals.fetchedCount)
-      : latestArrivals.length;
-    const loadedDepartures = Number.isFinite(Number(departures.fetchedCount))
-      ? Number(departures.fetchedCount)
-      : latestDepartures.length;
-
-    const summaryMessage = `Loaded ${loadedArrivals} arrivals and ${loadedDepartures} departures in one paginated snapshot.`;
-    const upstreamMessage = arrivals.message || departures.message || "";
-    const message = upstreamMessage ? `${summaryMessage} ${upstreamMessage}` : summaryMessage;
-    showNotice(message);
-    updateUnauthorizedFlag(message);
-
-    updateFilteredView();
-
-    elements.lastUpdatedText.textContent = `Last updated ${new Intl.DateTimeFormat(
-      "en-CA",
-      {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-      },
-    ).format(new Date())}`;
+    if (requestedAirportCode === activeAirportCode) {
+      applyAirportSnapshot(snapshot);
+      elements.lastUpdatedText.textContent = `Last updated ${new Intl.DateTimeFormat(
+        "en-CA",
+        {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        },
+      ).format(new Date())}`;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load all flight pages.";
     showNotice(message);
@@ -2222,6 +2569,34 @@ async function loadAllFlightsOnce() {
       elements.loadAllOnceButton.textContent = "Load all once";
     }
   }
+}
+
+async function bootstrapAirportSnapshots() {
+  const airportCodes = Object.keys(airportDefinitions);
+  const results = await Promise.allSettled(
+    airportCodes.map(async (airportCode) => {
+      const snapshot = await loadAirportSnapshot(airportCode);
+      cacheAirportSnapshot(snapshot);
+      return snapshot;
+    }),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      return;
+    }
+
+    const airportCode = airportCodes[index];
+    cacheAirportSnapshot(
+      createEmptyAirportSnapshot(airportCode, result.reason instanceof Error
+        ? result.reason.message
+        : `Unable to load ${airportCode} flight data.`),
+    );
+  });
+
+  activeAirportCode = null;
+  lockAirportGate();
+  hideAirportDataShell();
 }
 
 function refreshWhenVisible() {
@@ -2254,6 +2629,27 @@ elements.refreshButton.addEventListener("click", () => {
     pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
   }
   refreshFlights();
+});
+
+elements.airportSelectorButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const airportCode = button.dataset.airportCode;
+
+    if (!airportCode || normalizeAirportCode(airportCode) === activeAirportCode) {
+      return;
+    }
+
+    selectAirport(airportCode);
+
+    if (!pollingIntervalId) {
+      pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
+    }
+
+    window.setTimeout(() => {
+      const target = document.getElementById("dashboardStart");
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 180);
+  });
 });
 
 if (elements.loadAllOnceButton) {
@@ -2306,8 +2702,7 @@ if (elements.mapThemeToggle) {
   });
 }
 
-refreshFlights();
-pollingIntervalId = window.setInterval(refreshWhenVisible, refreshIntervalMs);
+bootstrapAirportSnapshots();
 window.addEventListener("resize", reflowResponsiveVisuals, { passive: true });
 window.addEventListener("orientationchange", reflowResponsiveVisuals);
 

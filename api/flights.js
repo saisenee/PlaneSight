@@ -1,13 +1,16 @@
-const airportConfig = {
-  code: "YYZ",
-  name: "Toronto Pearson International Airport",
+const airportConfigs = {
+  YYZ: {
+    code: "YYZ",
+    name: "Toronto Pearson International Airport",
+  },
+  CLT: {
+    code: "CLT",
+    name: "Charlotte Douglas International Airport",
+  },
 };
 
 const airportMetaCache = new Map();
-const flightsCache = {
-  arrival: null,
-  departure: null,
-};
+const flightsCache = {};
 const flightsTtlCache = new Map();
 
 // ICAO24 code to aircraft model mapping (Option 2)
@@ -140,7 +143,21 @@ function getConfig() {
   };
 }
 
-function placeholderResponse(type, message) {   
+function normalizeAirportCode(value) {
+  if (typeof value !== "string") {
+    return "YYZ";
+  }
+
+  const code = value.trim().toUpperCase();
+  return airportConfigs[code] ? code : "YYZ";
+}
+
+function getAirportConfig(query = {}) {
+  const airportCode = normalizeAirportCode(readQueryValue(query, "airport"));
+  return airportConfigs[airportCode] || airportConfigs.YYZ;
+}
+
+function placeholderResponse(type, airportConfig, message) {
   return {
     airportCode: airportConfig.code,
     airportName: airportConfig.name,
@@ -214,6 +231,7 @@ function isLoadAllRequested(query = {}) {
 }
 
 function buildCacheKey(type, query = {}) {
+  const airportCode = normalizeAirportCode(readQueryValue(query, "airport"));
   const all = isLoadAllRequested(query) ? "all" : "single";
   const limit = resolvedPageLimit(query);
   const filterPairs = passthroughParams
@@ -227,10 +245,10 @@ function buildCacheKey(type, query = {}) {
     .map(([key, value]) => `${key}=${value}`)
     .join("&");
 
-  return `${type}|${all}|limit=${limit}|${filterPairs}`;
+  return `${airportCode}|${type}|${all}|limit=${limit}|${filterPairs}`;
 }
 
-function buildLivePayload(type, payload) {
+function buildLivePayload(type, airportConfig, payload) {
   return {
     airportCode: airportConfig.code,
     airportName: airportConfig.name,
@@ -251,6 +269,7 @@ function buildLivePayload(type, payload) {
 }
 
 function getFreshCachedPayload(type, query = {}) {
+  const airportConfig = getAirportConfig(query);
   const cacheKey = buildCacheKey(type, query);
   const cacheEntry = flightsTtlCache.get(cacheKey);
 
@@ -265,7 +284,7 @@ function getFreshCachedPayload(type, query = {}) {
     return null;
   }
 
-  return buildLivePayload(type, {
+  return buildLivePayload(type, airportConfig, {
     ...cacheEntry,
     cached: true,
     message: `Serving cached ${type} data (${Math.round(ageMs / 1000)}s old) to reduce API usage.`,
@@ -285,7 +304,7 @@ function storeTtlCache(type, query, result) {
   });
 }
 
-function buildAviationStackUrl(type, query = {}) {
+function buildAviationStackUrl(type, query = {}, airportConfig = getAirportConfig(query)) {
   const config = getConfig();
   const url = new URL("/v1/flights", config.aviationStackBaseUrl);
 
@@ -544,7 +563,7 @@ function normalizeFlights(flights, type, airportLookup) {
   });
 }
 
-async function loadFlights(type, query) {
+async function loadFlights(type, query, airportConfig = getAirportConfig(query)) {
   const response = await fetch(buildAviationStackUrl(type, query), {
     cache: "no-store",
   });
@@ -590,7 +609,7 @@ async function loadAllFlights(type, query) {
       offset: String(offset),
     };
 
-    const pageResult = await loadFlights(type, pageQuery);
+    const pageResult = await loadFlights(type, pageQuery, getAirportConfig(pageQuery));
     mergedFlights.push(...pageResult.flights);
     pagesFetched += 1;
 
@@ -617,8 +636,8 @@ async function loadAllFlights(type, query) {
   };
 }
 
-function getCachedPayload(type) {
-  const cached = flightsCache[type];
+function getCachedPayload(type, airportConfig = airportConfigs.YYZ) {
+  const cached = flightsCache[`${airportConfig.code}:${type}`];
 
   if (!cached) {
     return null;
@@ -647,6 +666,7 @@ function getCachedPayload(type) {
 
 module.exports = async function handler(req, res) {
   const type = req.query.type;
+  const airportConfig = getAirportConfig(req.query);
 
   if (type !== "arrival" && type !== "departure") {
     return res
@@ -656,12 +676,16 @@ module.exports = async function handler(req, res) {
 
   if (!getConfig().aviationStackApiKey) {
     return res.json(
-      placeholderResponse(type, "Set AVIATIONSTACK_API_KEY to load live AviationStack data."),
+      placeholderResponse(
+        type,
+        airportConfig,
+        "Set AVIATIONSTACK_API_KEY to load live AviationStack data.",
+      ),
     );
   }
 
   if (getConfig().freezeAviationStack) {
-    const cachedPayload = getCachedPayload(type);
+    const cachedPayload = getCachedPayload(type, airportConfig);
 
     if (cachedPayload) {
       return res.json({
@@ -673,6 +697,7 @@ module.exports = async function handler(req, res) {
     return res.json(
       placeholderResponse(
         type,
+        airportConfig,
         "Live API calls are currently frozen (AVIATIONSTACK_FREEZE=true). Refreshing is disabled until unfrozen.",
       ),
     );
@@ -687,10 +712,10 @@ module.exports = async function handler(req, res) {
   try {
     const result = isLoadAllRequested(req.query)
       ? await loadAllFlights(type, req.query)
-      : await loadFlights(type, req.query);
+      : await loadFlights(type, req.query, airportConfig);
     const flights = result.flights;
 
-    flightsCache[type] = {
+    flightsCache[`${airportConfig.code}:${type}`] = {
       flights,
       totalAvailable: result.totalAvailable,
       updatedAt: Date.now(),
@@ -698,7 +723,7 @@ module.exports = async function handler(req, res) {
 
     storeTtlCache(type, req.query, result);
 
-    return res.json(buildLivePayload(type, {
+    return res.json(buildLivePayload(type, airportConfig, {
       flights,
       fetchedCount: result.fetchedCount,
       totalAvailable: result.totalAvailable,
@@ -712,7 +737,7 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to fetch live flight data.";
     const rateLimited = message.includes(" 429");
-    const cachedPayload = getCachedPayload(type);
+    const cachedPayload = getCachedPayload(type, airportConfig);
 
     if (rateLimited && cachedPayload) {
       return res.json(cachedPayload);
@@ -721,6 +746,7 @@ module.exports = async function handler(req, res) {
     return res.json({
       ...placeholderResponse(
         type,
+        airportConfig,
         rateLimited
           ? "AviationStack rate limit reached. Refresh less frequently or wait for reset."
           : message,
