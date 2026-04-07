@@ -177,19 +177,14 @@
 
       <section id="statusSection" class="status-grid reveal-section">
         <article class="status-card">
-          <span class="status-card-label">Arrivals</span>
+          <span class="status-card-label">Total Arrivals</span>
           <strong id="arrivalsCount" class="status-card-value">0</strong>
-          <p class="status-card-detail">Total arrivals available for YYZ</p>
+          <p class="status-card-detail">All scheduled arrivals for YYZ</p>
         </article>
         <article class="status-card">
-          <span class="status-card-label">Departures</span>
+          <span class="status-card-label">Total Departures</span>
           <strong id="departuresCount" class="status-card-value">0</strong>
-          <p class="status-card-detail">Total departures available for YYZ</p>
-        </article>
-        <article class="status-card">
-          <span class="status-card-label">Live Flights</span>
-          <strong id="liveCount" class="status-card-value">0</strong>
-          <p class="status-card-detail">Flights marked live by AviationStack</p>
+          <p class="status-card-detail">All scheduled departures for YYZ</p>
         </article>
       </section>
 
@@ -233,9 +228,9 @@
               <p id="airportHistoryText">—</p>
             </div>
 
-            <div>
+            <div class="airport-highlights-section">
               <h4>Quick Highlights</h4>
-              <ul id="airportHighlightsList" class="airport-highlights-list"></ul>
+              <div id="airportHighlightsList" class="airport-highlights-list"></div>
             </div>
           </article>
 
@@ -315,11 +310,19 @@
         </section>
 
         <div id="dataVisualizationsSection" class="viz-grid">
-          <section id="topRoutesSection" class="viz-card">
-            <h3>Top Routes to/from YYZ</h3>
-            <p>Most frequent origin/destination pairs from the current live feed.</p>
-            <div class="chart-wrap">
-              <canvas id="topRoutesChart" aria-label="Top routes chart" role="img"></canvas>
+          <section id="topRoutesSection" class="viz-card top-summary-card">
+            <div class="top-summary-grid">
+              <article class="top-summary-panel">
+                <h3>Most Flown Routes Today</h3>
+                <p>Top three origin and destination pairs from the live feed.</p>
+                <ol id="topRoutesList" class="top-ranked-list"></ol>
+              </article>
+
+              <article class="top-summary-panel">
+                <h3>Most Flown Airlines Today</h3>
+                <p>Top three airlines by current live flight count.</p>
+                <ol id="topAirlinesList" class="top-ranked-list"></ol>
+              </article>
             </div>
           </section>
 

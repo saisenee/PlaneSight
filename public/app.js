@@ -254,9 +254,10 @@ const elements = {
   airportHighlightsList: document.getElementById("airportHighlightsList"),
   airportRestaurantsMiniMap: document.getElementById("airportRestaurantsMiniMap"),
   airportRestaurantsGrid: document.getElementById("airportRestaurantsGrid"),
+  topRoutesList: document.getElementById("topRoutesList"),
+  topAirlinesList: document.getElementById("topAirlinesList"),
   arrivalsCount: document.getElementById("arrivalsCount"),
   departuresCount: document.getElementById("departuresCount"),
-  liveCount: document.getElementById("liveCount"),
   arrivalsPill: document.getElementById("arrivalsPill"),
   departuresPill: document.getElementById("departuresPill"),
   arrivalsTableBody: document.getElementById("arrivalsTableBody"),
@@ -350,9 +351,6 @@ function hideAirportDataShell() {
   if (elements.departuresCount) {
     elements.departuresCount.textContent = "0";
   }
-  if (elements.liveCount) {
-    elements.liveCount.textContent = "0";
-  }
   if (elements.arrivalsPill) {
     elements.arrivalsPill.textContent = "Locked";
   }
@@ -423,10 +421,19 @@ function updateAirportShell(airportCode) {
   const routesHeading = document.querySelector("#topRoutesSection h3");
   const routesDescription = document.querySelector("#topRoutesSection p");
   if (routesHeading) {
-    routesHeading.textContent = `Top Routes to/from ${airport.code}`;
+    routesHeading.textContent = "Most Flown Routes Today";
   }
   if (routesDescription) {
-    routesDescription.textContent = `Most frequent origin/destination pairs from the current live ${airport.code} feed.`;
+    routesDescription.textContent = `Top three routes currently moving through ${airport.code}.`;
+  }
+
+  const airlinesHeading = document.querySelector("#topRoutesSection .top-summary-panel:nth-child(2) h3");
+  const airlinesDescription = document.querySelector("#topRoutesSection .top-summary-panel:nth-child(2) p");
+  if (airlinesHeading) {
+    airlinesHeading.textContent = "Most Flown Airlines Today";
+  }
+  if (airlinesDescription) {
+    airlinesDescription.textContent = `Top three airlines currently moving through ${airport.code}.`;
   }
 
   const hourlyHeading = document.querySelector("#hourlyClockSection h3");
@@ -835,7 +842,7 @@ async function renderAirportDeepDive(airportCode) {
   }
   if (elements.airportHighlightsList) {
     elements.airportHighlightsList.innerHTML = (facts.highlights || [])
-      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .map((item) => `<div class="airport-highlight-item">${escapeHtml(item)}</div>`)
       .join("");
   }
 
@@ -1268,6 +1275,19 @@ function buildTopRoutes(flights) {
     .slice(0, 8);
 }
 
+function buildTopAirlines(flights) {
+  const airlineCounts = new Map();
+
+  for (const flight of flights) {
+    const airline = flight.airline || "Unknown airline";
+    airlineCounts.set(airline, (airlineCounts.get(airline) || 0) + 1);
+  }
+
+  return [...airlineCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+}
+
 function buildHourlyBuckets(flights) {
   const buckets = new Array(24).fill(0);
 
@@ -1295,66 +1315,50 @@ function shortenLabel(value, maxLength) {
 }
 
 function createOrUpdateTopRoutesChart(flights) {
-  if (!elements.topRoutesChart || typeof Chart === "undefined") {
+  if (!elements.topRoutesList || !elements.topAirlinesList) {
     return;
   }
 
-  const compact = isCompactViewport();
   const topRoutes = buildTopRoutes(flights);
-  const labels = topRoutes.map(([route]) => route);
-  const values = topRoutes.map(([, count]) => count);
-  const dataset = {
-    label: "Flights",
-    data: values,
-    borderRadius: 8,
-    backgroundColor: "rgba(86, 204, 242, 0.7)",
-    borderColor: "rgba(176, 232, 255, 0.95)",
-    borderWidth: 1,
-  };
+  const topAirlines = buildTopAirlines(flights);
+  const topThreeRoutes = topRoutes.slice(0, 3);
 
-  const options = {
-    indexAxis: "y",
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label(context) {
-            return `${context.parsed.x} flights`;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: { color: "#d0ddf0", precision: 0 },
-        grid: { color: "rgba(196, 217, 243, 0.15)" },
-      },
-      y: {
-        ticks: {
-          color: "#eff6ff",
-          callback(value, index) {
-            return shortenLabel(labels[index], compact ? 16 : 34);
-          },
-        },
-        grid: { display: false },
-      },
-    },
-  };
+  elements.topRoutesList.innerHTML = topThreeRoutes.length
+    ? topThreeRoutes.map(([route, count], index) => `
+        <li class="top-ranked-item">
+          <strong>${index + 1}. ${escapeHtml(route)}</strong>
+          <span>${escapeHtml(`${count} flights`)}</span>
+        </li>
+      `).join("")
+    : '<p class="top-ranked-empty">No route data yet.</p>';
 
-  if (topRoutesChart) {
-    topRoutesChart.data.labels = labels;
-    topRoutesChart.data.datasets[0].data = values;
-    topRoutesChart.options = options;
-    topRoutesChart.update();
-    return;
-  }
+  elements.topAirlinesList.innerHTML = topAirlines.length
+    ? topAirlines.map(([airline, count], index) => {
+        const logoUrl = airlineLogoUrlForName(airline);
+        const logoFallbacks = airlineLogoCandidatesForName(airline).slice(1).join("|");
+        const initials = String(airline || "")
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((part) => part.charAt(0))
+          .join("")
+          .toUpperCase() || "?";
 
-  topRoutesChart = new Chart(elements.topRoutesChart, {
-    type: "bar",
-    data: { labels, datasets: [dataset] },
-    options,
-  });
+        const logoMarkup = logoUrl
+          ? `<img class="airline-logo top-ranked-logo" src="${logoUrl}" data-fallback-src="${escapeHtml(logoFallbacks)}" alt="" loading="lazy" decoding="async" onerror="window.handleAirlineLogoError && window.handleAirlineLogoError(this)" />`
+          : `<span class="airline-logo top-ranked-logo top-ranked-logo--fallback" aria-hidden="true">${escapeHtml(initials)}</span>`;
+
+        return `
+        <li class="top-ranked-item top-ranked-item--airline">
+          <div class="top-ranked-item-main">
+            ${logoMarkup}
+            <strong>${index + 1}. ${escapeHtml(airline)}</strong>
+          </div>
+          <span>${escapeHtml(`${count} flights`)}</span>
+        </li>
+      `;
+      }).join("")
+    : '<p class="top-ranked-empty">No airline data yet.</p>';
 }
 
 function createOrUpdateHourlyClockChart(flights) {
@@ -1905,6 +1909,15 @@ function airlineLogoUrl(flight) {
   return candidates.length ? candidates[0] : null;
 }
 
+function airlineLogoCandidatesForName(airlineName) {
+  return airlineLogoCandidates({ airline: airlineName });
+}
+
+function airlineLogoUrlForName(airlineName) {
+  const candidates = airlineLogoCandidatesForName(airlineName);
+  return candidates.length ? candidates[0] : null;
+}
+
 function statusLabel(status, isLive) {
   if (isLive) {
     return "live";
@@ -2038,7 +2051,6 @@ function updateFilteredView() {
   elements.departuresCount.textContent = String(departureTotalDisplay);
   elements.arrivalsPill.textContent = `${arrivalsFiltered.length} shown · ${arrivalTotalDisplay} total`;
   elements.departuresPill.textContent = `${departuresFiltered.length} shown · ${departureTotalDisplay} total`;
-  elements.liveCount.textContent = String(filteredAll.filter((flight) => flight.isLive).length);
 
   renderFlights(
     elements.arrivalsTableBody,
