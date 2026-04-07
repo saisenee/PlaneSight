@@ -41,6 +41,7 @@ body {
 
 body.airport-gate-active .hero-scroll-section,
 body.airport-gate-active #statusSection,
+body.airport-gate-active #airportDeepDiveSection,
 body.airport-gate-active #visualsSection,
 body.airport-gate-active #boardsSection,
 body.airport-gate-active #footerSection,
@@ -947,6 +948,220 @@ p {
   background: linear-gradient(180deg, rgba(86, 204, 242, 0.06), rgba(47, 128, 237, 0.04));
 }
 
+.airport-deep-dive {
+  padding-bottom: 24px;
+}
+
+.airport-deep-dive-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.25fr);
+  gap: 18px;
+  padding: 0 24px;
+}
+
+.airport-facts-card,
+.airport-restaurants-card {
+  border: 1px solid rgba(196, 217, 243, 0.34);
+  border-radius: 18px;
+  background: rgba(4, 14, 58, 0.62);
+  padding: 18px;
+}
+
+.airport-facts-card h3,
+.airport-restaurants-card h3 {
+  margin: 0 0 10px;
+}
+
+.airport-facts-list {
+  display: grid;
+  gap: 10px;
+}
+
+.airport-facts-list span {
+  display: block;
+  color: rgba(180, 207, 236, 0.88);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.airport-facts-list p {
+  margin: 0;
+  color: #e9f3ff;
+  font-size: 0.92rem;
+}
+
+.airport-facts-list a {
+  color: #8fd6ff;
+}
+
+.airport-history-note {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(196, 217, 243, 0.26);
+  background: rgba(89, 145, 226, 0.1);
+}
+
+.airport-history-note h4,
+.airport-facts-card h4 {
+  margin: 0 0 6px;
+}
+
+.airport-history-note p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.airport-highlights-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.airport-highlights-list li {
+  color: #dbeafc;
+  font-size: 0.9rem;
+}
+
+.airport-restaurants-head p {
+  margin: 0 0 12px;
+}
+
+.airport-restaurants-map {
+  width: 100%;
+  min-height: 200px;
+  border-radius: 14px;
+  border: 1px solid rgba(196, 217, 243, 0.34);
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: rgba(10, 24, 66, 0.72);
+}
+
+.airport-restaurants-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.airport-restaurant-card {
+  border: 1px solid rgba(196, 217, 243, 0.28);
+  border-radius: 14px;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 170px;
+  background: linear-gradient(180deg, rgba(11, 37, 101, 0.55), rgba(5, 18, 63, 0.7));
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.airport-restaurant-card:hover,
+.airport-restaurant-card:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(150, 221, 255, 0.66);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+}
+
+.restaurant-preview {
+  position: relative;
+  min-height: 170px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+
+.restaurant-image-placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(24, 63, 146, 0.62), rgba(8, 26, 76, 0.9));
+  color: rgba(220, 236, 255, 0.82);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.restaurant-preview-footer {
+  padding: 10px 12px;
+  background: rgba(4, 15, 52, 0.8);
+  border-top: 1px solid rgba(196, 217, 243, 0.2);
+}
+
+.restaurant-preview-footer h4 {
+  margin: 0 0 8px;
+  font-size: 0.96rem;
+}
+
+.restaurant-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #cde2fb;
+}
+
+.restaurant-detail-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px 12px;
+  background: linear-gradient(180deg, rgba(5, 16, 54, 0.2), rgba(5, 16, 54, 0.96) 22%);
+  border-top: 1px solid rgba(196, 217, 243, 0.28);
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.airport-restaurant-card:hover .restaurant-detail-overlay,
+.airport-restaurant-card:focus-within .restaurant-detail-overlay {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.restaurant-details {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.restaurant-details span {
+  color: #dceafb;
+  font-size: 0.82rem;
+  line-height: 1.32;
+}
+
+.restaurant-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.restaurant-links a {
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(142, 211, 255, 0.5);
+  color: #dcf0ff;
+  background: rgba(12, 44, 113, 0.48);
+}
+
+.airport-restaurants-empty {
+  margin: 0;
+  color: #c7dbf5;
+  font-size: 0.88rem;
+}
+
+@media (hover: none) {
+  .restaurant-detail-overlay {
+    position: static;
+    transform: none;
+    opacity: 1;
+    background: rgba(5, 16, 54, 0.84);
+  }
+}
+
 .viz-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -1425,6 +1640,10 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .airport-deep-dive-grid {
+    grid-template-columns: 1fr;
+  }
+
   #domesticMixSection {
     grid-column: auto;
   }
@@ -1491,6 +1710,10 @@ p {
   }
 
   .selected-flight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .airport-restaurants-grid {
     grid-template-columns: 1fr;
   }
 

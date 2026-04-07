@@ -145,6 +145,20 @@ const airportDefinitions = {
     photoAlt: "Toronto Pearson airport terminal",
     siteUrl: "https://www.torontopearson.com/en",
     siteLabel: "Visit Site",
+    facts: {
+      address: "6301 Silver Dart Dr, Mississauga, ON L5P 1B2, Canada",
+      terminals: "2 public passenger terminals (Terminal 1 and Terminal 3)",
+      opened: "1939",
+      annualTraffic: "~45 million annual passengers",
+      history:
+        "Opened as Malton Airport, it became Toronto Pearson and evolved into Canada's busiest international gateway.",
+      highlights: [
+        "Canada's largest and busiest airport.",
+        "Major connection point for North America and overseas routes.",
+        "Primary airport for the Greater Toronto Area.",
+      ],
+    },
+    restaurantCsvPath: "/airportdata/PlaneSight%20-%20Pearson%20Restaurants.csv",
   },
   CLT: {
     code: "CLT",
@@ -158,6 +172,20 @@ const airportDefinitions = {
     photoAlt: "Charlotte Douglas International Airport",
     siteUrl: "https://www.cltairport.com/",
     siteLabel: "Visit Site",
+    facts: {
+      address: "5501 Josh Birmingham Pkwy, Charlotte, NC 28208, USA",
+      terminals: "1 terminal with 5 concourses (A, B, C, D, E)",
+      opened: "1935",
+      annualTraffic: "~50 million annual passengers",
+      history:
+        "CLT grew from a city airport into one of the busiest U.S. connecting hubs with extensive domestic and international reach.",
+      highlights: [
+        "One of the busiest airports in the United States.",
+        "Strong east-coast hub with high daily departures.",
+        "Central to Charlotte's economic and logistics network.",
+      ],
+    },
+    restaurantCsvPath: "/airportdata/PlaneSight%20-%20Charlotte%20Restaurants.csv",
   },
 };
 
@@ -197,6 +225,10 @@ let activeAirportCode = null;
 const airportSnapshotCache = new Map();
 let airportPhotoIntervalId = null;
 let airportPhotoElements = null;
+const airportRestaurantsCache = new Map();
+let airportRestaurantsMap = null;
+let airportRestaurantsMapLayer = null;
+let airportRestaurantsMapTileLayer = null;
 
 const elements = {
   airportSelectorButtons: document.querySelectorAll("[data-airport-code]"),
@@ -210,6 +242,18 @@ const elements = {
   heroAirportBlurb: document.getElementById("heroAirportBlurb"),
   heroAirportVisitButton: document.getElementById("heroAirportVisitButton"),
   heroAirportPhoto: document.getElementById("heroAirportPhoto"),
+  airportDeepDiveTitle: document.getElementById("airportDeepDiveTitle"),
+  airportDeepDiveSubtitle: document.getElementById("airportDeepDiveSubtitle"),
+  airportDeepDiveCodePill: document.getElementById("airportDeepDiveCodePill"),
+  airportFactAddress: document.getElementById("airportFactAddress"),
+  airportFactWebsite: document.getElementById("airportFactWebsite"),
+  airportFactTerminals: document.getElementById("airportFactTerminals"),
+  airportFactOpened: document.getElementById("airportFactOpened"),
+  airportFactTraffic: document.getElementById("airportFactTraffic"),
+  airportHistoryText: document.getElementById("airportHistoryText"),
+  airportHighlightsList: document.getElementById("airportHighlightsList"),
+  airportRestaurantsMiniMap: document.getElementById("airportRestaurantsMiniMap"),
+  airportRestaurantsGrid: document.getElementById("airportRestaurantsGrid"),
   arrivalsCount: document.getElementById("arrivalsCount"),
   departuresCount: document.getElementById("departuresCount"),
   liveCount: document.getElementById("liveCount"),
@@ -429,6 +473,7 @@ function updateAirportShell(airportCode) {
     routeLegendItems[1].childNodes[1].nodeValue = `From ${airport.code} (departures)`;
   }
 
+  renderAirportDeepDive(airport.code);
   updateAirportSelectorState(airport.code);
 }
 
@@ -494,6 +539,309 @@ function configureAirportPhotoRotation(airportCode) {
     activeIndex = (activeIndex + 1) % imageSources.length;
     crossfadeTo(imageSources[activeIndex]);
   }, 3000);
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (ch === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  values.push(current);
+  return values;
+}
+
+function parseCsvRows(csvText) {
+  const lines = String(csvText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]).map((header) => header.trim());
+
+  return lines.slice(1).map((line) => {
+    const rawValues = parseCsvLine(line);
+    const row = {};
+
+    headers.forEach((header, index) => {
+      row[header] = (rawValues[index] || "").trim();
+    });
+
+    return row;
+  });
+}
+
+function toNumberOrNull(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeRestaurantRecord(row) {
+  return {
+    name: row["Business Name"] || "Unnamed restaurant",
+    address: row.Address || "Address unavailable",
+    phone: row.Phone || "Phone unavailable",
+    website: row.Website || "",
+    rating: toNumberOrNull(row.Rating),
+    reviews: toNumberOrNull(row.Reviews),
+    category: row.Category || "Restaurant",
+    mapsUrl: row["Google Maps URL"] || "",
+    latitude: toNumberOrNull(row.Latitude),
+    longitude: toNumberOrNull(row.Longitude),
+  };
+}
+
+async function getAirportRestaurants(airportCode) {
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+
+  if (airportRestaurantsCache.has(normalizedAirportCode)) {
+    return airportRestaurantsCache.get(normalizedAirportCode);
+  }
+
+  const airport = getAirportDefinition(normalizedAirportCode);
+  const csvPath = airport.restaurantCsvPath;
+
+  if (!csvPath) {
+    airportRestaurantsCache.set(normalizedAirportCode, []);
+    return [];
+  }
+
+  try {
+    const response = await fetch(csvPath, { cache: "force-cache" });
+
+    if (!response.ok) {
+      airportRestaurantsCache.set(normalizedAirportCode, []);
+      return [];
+    }
+
+    const csvText = await response.text();
+    const restaurants = parseCsvRows(csvText).map(normalizeRestaurantRecord);
+    airportRestaurantsCache.set(normalizedAirportCode, restaurants);
+    return restaurants;
+  } catch {
+    airportRestaurantsCache.set(normalizedAirportCode, []);
+    return [];
+  }
+}
+
+function renderRestaurantCards(restaurants) {
+  if (!elements.airportRestaurantsGrid) {
+    return;
+  }
+
+  if (!restaurants.length) {
+    elements.airportRestaurantsGrid.innerHTML = '<p class="airport-restaurants-empty">No restaurant data available for this airport yet.</p>';
+    return;
+  }
+
+  const featured = [...restaurants]
+    .sort((a, b) => {
+      const ratingDiff = (b.rating || 0) - (a.rating || 0);
+      if (ratingDiff !== 0) {
+        return ratingDiff;
+      }
+      return (b.reviews || 0) - (a.reviews || 0);
+    })
+    .slice(0, 6);
+
+  elements.airportRestaurantsGrid.innerHTML = featured
+    .map((restaurant) => {
+      const ratingText = Number.isFinite(restaurant.rating)
+        ? `★ ${restaurant.rating.toFixed(1)} / 5`
+        : "No rating";
+      const reviewsText = Number.isFinite(restaurant.reviews)
+        ? `${restaurant.reviews.toLocaleString()} reviews`
+        : "Reviews n/a";
+      const websiteLink = restaurant.website
+        ? `<a href="${escapeHtml(restaurant.website)}" target="_blank" rel="noopener noreferrer">Website</a>`
+        : "";
+      const mapsLink = restaurant.mapsUrl
+        ? `<a href="${escapeHtml(restaurant.mapsUrl)}" target="_blank" rel="noopener noreferrer">Google Maps</a>`
+        : "";
+
+      return `
+        <article class="airport-restaurant-card">
+          <div class="restaurant-preview">
+            <div class="restaurant-image-placeholder">Image Slot</div>
+            <div class="restaurant-preview-footer">
+              <h4>${escapeHtml(restaurant.name)}</h4>
+              <div class="restaurant-meta">
+                <span>${escapeHtml(ratingText)}</span>
+                <span>${escapeHtml(reviewsText)}</span>
+              </div>
+            </div>
+            <div class="restaurant-detail-overlay">
+              <div class="restaurant-meta">
+                <span>${escapeHtml(restaurant.category)}</span>
+                <span>${escapeHtml(ratingText)}</span>
+                <span>${escapeHtml(reviewsText)}</span>
+              </div>
+              <div class="restaurant-details">
+                <span><b>Address:</b> ${escapeHtml(restaurant.address)}</span>
+                <span><b>Phone:</b> ${escapeHtml(restaurant.phone)}</span>
+              </div>
+              <div class="restaurant-links">
+                ${websiteLink}
+                ${mapsLink}
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function ensureAirportRestaurantsMap() {
+  if (!window.L || !elements.airportRestaurantsMiniMap) {
+    return false;
+  }
+
+  if (airportRestaurantsMap) {
+    airportRestaurantsMap.invalidateSize();
+    return true;
+  }
+
+  airportRestaurantsMap = window.L.map(elements.airportRestaurantsMiniMap, {
+    zoomControl: true,
+    attributionControl: true,
+    minZoom: 2,
+    maxZoom: 16,
+  });
+
+  airportRestaurantsMapLayer = window.L.layerGroup().addTo(airportRestaurantsMap);
+  airportRestaurantsMap.setView([20, 0], 2);
+  return true;
+}
+
+function syncAirportRestaurantsMapTheme() {
+  if (!window.L || !airportRestaurantsMap) {
+    return;
+  }
+
+  const config = mapTileConfig(mapTheme);
+
+  if (airportRestaurantsMapTileLayer) {
+    airportRestaurantsMap.removeLayer(airportRestaurantsMapTileLayer);
+  }
+
+  airportRestaurantsMapTileLayer = window.L.tileLayer(config.url, {
+    minZoom: 2,
+    maxZoom: 16,
+    attribution: config.attribution,
+  }).addTo(airportRestaurantsMap);
+}
+
+function renderAirportRestaurantsMap(restaurants) {
+  if (!ensureAirportRestaurantsMap() || !airportRestaurantsMapLayer) {
+    return;
+  }
+
+  syncAirportRestaurantsMapTheme();
+  airportRestaurantsMapLayer.clearLayers();
+
+  const boundsPoints = [];
+
+  restaurants.forEach((restaurant) => {
+    if (!Number.isFinite(restaurant.latitude) || !Number.isFinite(restaurant.longitude)) {
+      return;
+    }
+
+    const marker = window.L.circleMarker([restaurant.latitude, restaurant.longitude], {
+      radius: 6,
+      color: "rgba(255,255,255,0.88)",
+      weight: 1.2,
+      fillColor: "#56ccf2",
+      fillOpacity: 0.84,
+    });
+
+    marker.bindPopup(`
+      <strong>${escapeHtml(restaurant.name)}</strong><br/>
+      ${escapeHtml(restaurant.address)}<br/>
+      Rating: ${escapeHtml(Number.isFinite(restaurant.rating) ? `★ ${restaurant.rating.toFixed(1)}` : "n/a")}
+    `);
+
+    marker.addTo(airportRestaurantsMapLayer);
+    boundsPoints.push([restaurant.latitude, restaurant.longitude]);
+  });
+
+  if (boundsPoints.length) {
+    airportRestaurantsMap.fitBounds(boundsPoints, {
+      padding: [20, 20],
+      maxZoom: 12,
+    });
+  } else {
+    airportRestaurantsMap.setView([20, 0], 2);
+  }
+}
+
+async function renderAirportDeepDive(airportCode) {
+  const airport = getAirportDefinition(airportCode);
+  const facts = airport.facts || {};
+
+  if (elements.airportDeepDiveTitle) {
+    elements.airportDeepDiveTitle.textContent = `${airport.title} Deep Dive`;
+  }
+  if (elements.airportDeepDiveSubtitle) {
+    elements.airportDeepDiveSubtitle.textContent = "Address, operations, and food highlights sourced for this airport.";
+  }
+  if (elements.airportDeepDiveCodePill) {
+    elements.airportDeepDiveCodePill.textContent = airport.code;
+  }
+  if (elements.airportFactAddress) {
+    elements.airportFactAddress.textContent = facts.address || "—";
+  }
+  if (elements.airportFactWebsite) {
+    elements.airportFactWebsite.href = airport.siteUrl || "#";
+    elements.airportFactWebsite.textContent = airport.siteUrl || "Official airport site";
+  }
+  if (elements.airportFactTerminals) {
+    elements.airportFactTerminals.textContent = facts.terminals || "—";
+  }
+  if (elements.airportFactOpened) {
+    elements.airportFactOpened.textContent = facts.opened || "—";
+  }
+  if (elements.airportFactTraffic) {
+    elements.airportFactTraffic.textContent = facts.annualTraffic || "—";
+  }
+  if (elements.airportHistoryText) {
+    elements.airportHistoryText.textContent = facts.history || "—";
+  }
+  if (elements.airportHighlightsList) {
+    elements.airportHighlightsList.innerHTML = (facts.highlights || [])
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("");
+  }
+
+  const restaurants = await getAirportRestaurants(airport.code);
+  renderRestaurantCards(restaurants);
+  renderAirportRestaurantsMap(restaurants);
 }
 
 function applyAirportSnapshot(snapshot) {
@@ -1858,22 +2206,26 @@ function syncMapThemeToggleUi() {
 }
 
 function applyLeafletMapTheme() {
-  if (!window.L || !constellationMap) {
+  if (!window.L) {
     return;
   }
 
   const config = mapTileConfig(mapTheme);
 
-  if (mapTileLayer) {
-    constellationMap.removeLayer(mapTileLayer);
+  if (constellationMap) {
+    if (mapTileLayer) {
+      constellationMap.removeLayer(mapTileLayer);
+    }
+
+    mapTileLayer = window.L.tileLayer(config.url, {
+      minZoom: 2,
+      maxZoom: 6,
+      noWrap: true,
+      attribution: config.attribution,
+    }).addTo(constellationMap);
   }
 
-  mapTileLayer = window.L.tileLayer(config.url, {
-    minZoom: 2,
-    maxZoom: 6,
-    noWrap: true,
-    attribution: config.attribution,
-  }).addTo(constellationMap);
+  syncAirportRestaurantsMapTheme();
 
   window.localStorage.setItem("planesight-map-theme", mapTheme);
   syncMapThemeToggleUi();
@@ -2008,9 +2360,6 @@ function ensureLeafletConstellation(container) {
 
 function renderConstellationLeaflet(flights) {
   const container = elements.flightConstellation;
-  const activeHubCode = normalizeAirportCode(activeAirportCode);
-  const activeHub = knownAirportCoordinate(activeHubCode);
-  const activeAirport = getAirportDefinition(activeHubCode);
 
   if (!container || !ensureLeafletConstellation(container) || !constellationMap) {
     return false;
@@ -2022,25 +2371,6 @@ function renderConstellationLeaflet(flights) {
   container.querySelectorAll(".airport-point").forEach((node) => node.remove());
 
   const boundsPoints = [];
-  if (activeHub) {
-    const airportMarker = window.L.marker([activeHub.lat, activeHub.lon], {
-      icon: window.L.divIcon({
-        className: "airport-hub-marker-wrap",
-        html: '<div class="airport-hub-marker" aria-hidden="true">★</div>',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      }),
-      zIndexOffset: 1400,
-    });
-
-    airportMarker.bindTooltip(`${activeHubCode} · ${activeAirport.title}`, {
-      direction: "top",
-      opacity: 0.96,
-    });
-
-    airportMarker.addTo(markerLayerGroup);
-    boundsPoints.push([activeHub.lat, activeHub.lon]);
-  }
 
   for (const flight of flights) {
     const coords = buildFlightLatLon(flight);
@@ -2107,9 +2437,6 @@ function renderConstellation(flights) {
 
 function renderConstellationFallback(flights) {
   const container = elements.flightConstellation;
-  const activeHubCode = normalizeAirportCode(activeAirportCode);
-  const activeHub = knownAirportCoordinate(activeHubCode);
-  const activeAirport = getAirportDefinition(activeHubCode);
 
   if (!container) {
     return;
@@ -2128,18 +2455,6 @@ function renderConstellationFallback(flights) {
   svg.setAttribute("viewBox", "0 0 100 100");
   svg.setAttribute("preserveAspectRatio", "none");
   container.appendChild(svg);
-
-  if (activeHub) {
-    const airportPoint = mapCoordinateToContainer(projectCoordinate(activeHub.lat, activeHub.lon), width, height);
-    const hub = document.createElement("div");
-    hub.className = "airport-point";
-    hub.textContent = "★";
-    hub.style.left = `${airportPoint.x}%`;
-    hub.style.top = `${airportPoint.y}%`;
-    hub.setAttribute("aria-label", `${activeHubCode} ${activeAirport.title} hub`);
-    hub.title = `${activeHubCode} · ${activeAirport.title}`;
-    container.appendChild(hub);
-  }
 
   const mapWidth = Math.min(width, height * worldMapAspectRatio);
   const mapHeight = mapWidth / worldMapAspectRatio;

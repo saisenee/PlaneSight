@@ -193,6 +193,65 @@
         </article>
       </section>
 
+      <section id="airportDeepDiveSection" class="panel airport-deep-dive reveal-section">
+        <div class="panel-header">
+          <div>
+            <h2 id="airportDeepDiveTitle">Airport Deep Dive</h2>
+            <p id="airportDeepDiveSubtitle">Address, operational facts, and local highlights for the selected airport.</p>
+          </div>
+          <span id="airportDeepDiveCodePill" class="panel-pill">YYZ</span>
+        </div>
+
+        <div class="airport-deep-dive-grid">
+          <article class="airport-facts-card">
+            <h3>Airport Facts</h3>
+            <div class="airport-facts-list">
+              <div>
+                <span>Address</span>
+                <p id="airportFactAddress">—</p>
+              </div>
+              <div>
+                <span>Website</span>
+                <p><a id="airportFactWebsite" href="#" target="_blank" rel="noopener noreferrer">Official airport site</a></p>
+              </div>
+              <div>
+                <span>Terminal Layout</span>
+                <p id="airportFactTerminals">—</p>
+              </div>
+              <div>
+                <span>Opened</span>
+                <p id="airportFactOpened">—</p>
+              </div>
+              <div>
+                <span>Annual Traffic</span>
+                <p id="airportFactTraffic">—</p>
+              </div>
+            </div>
+
+            <div class="airport-history-note">
+              <h4>History Snapshot</h4>
+              <p id="airportHistoryText">—</p>
+            </div>
+
+            <div>
+              <h4>Quick Highlights</h4>
+              <ul id="airportHighlightsList" class="airport-highlights-list"></ul>
+            </div>
+          </article>
+
+          <article class="airport-restaurants-card">
+            <div class="airport-restaurants-head">
+              <h3>Featured Restaurants</h3>
+              <p>Picked from your airport CSV source data.</p>
+            </div>
+
+            <div id="airportRestaurantsMiniMap" class="airport-restaurants-map" aria-label="Restaurant map"></div>
+
+            <div id="airportRestaurantsGrid" class="airport-restaurants-grid"></div>
+          </article>
+        </div>
+      </section>
+
       <!-- <section id="noticePanel" class="panel notice-panel hidden reveal-section">
         <h2>Setup notice</h2>
         <p id="noticeText"></p>
@@ -291,13 +350,6 @@
               </p>
             </div>
             <div class="art-controls">
-              <div class="legend" aria-label="Status legend">
-                <span><i class="dot dot-scheduled"></i>Scheduled</span>
-                <span><i class="dot dot-active"></i>Active</span>
-                <span><i class="dot dot-landed"></i>Landed</span>
-                <span><i class="dot dot-cancelled"></i>Cancelled</span>
-                <span><i class="dot dot-other"></i>Other</span>
-              </div>
               <div class="route-legend" aria-label="Route direction legend">
                 <span><i class="route-sample route-sample-arrival"></i>To YYZ (arrivals)</span>
                 <span><i class="route-sample route-sample-departure"></i>From YYZ (departures)</span>
@@ -405,6 +457,7 @@
       <nav class="side-nav" aria-label="Section quick navigation">
         <button class="side-nav-item" type="button" data-target="landingSection" data-label="Home">Home</button>
         <button class="side-nav-item" type="button" data-target="airportDataSection" data-label="Flight Data" data-trigger="top">Flight Data</button>
+        <button class="side-nav-item" type="button" data-target="airportDeepDiveSection" data-label="Airport Guide">Airport Guide</button>
         <button class="side-nav-item" type="button" data-target="topRoutesSection" data-label="Top Routes">Top Routes</button>
         <button class="side-nav-item" type="button" data-target="hourlyClockSection" data-label="24-Hour Clock">24-Hour Clock</button>
         <button class="side-nav-item" type="button" data-target="domesticMixSection" data-label="Domestic vs Intl">Domestic vs Intl</button>
