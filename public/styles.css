@@ -159,13 +159,24 @@ code {
   position: absolute;
   left: 50%;
   top: calc(100% + 8px);
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-2px);
   color: rgba(216, 233, 250, 0.76);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
   pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+}
+
+.side-nav-item:hover::after,
+.side-nav-item:focus-visible::after,
+.side-nav-item.active::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 .side-nav-item.active {
@@ -866,10 +877,96 @@ p {
   padding: 24px;
 }
 
+.floating-brand {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  z-index: 56;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: rgba(6, 22, 86, 0.78);
+  border: 1px solid rgba(196, 217, 243, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+}
+
+.floating-brand img {
+  width: min(130px, 32vw);
+  height: auto;
+  display: block;
+}
+
+.floating-brand.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.filter-fab {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 55;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.filter-fab-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.filter-popup {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100vh - 82px);
+  overflow-y: auto;
+  z-index: 54;
+  border-radius: 18px;
+  border: 1px solid rgba(196, 217, 243, 0.34);
+  background: rgba(6, 22, 86, 0.94);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  padding: 14px;
+}
+
+.filter-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.filter-popup-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.filter-popup-close {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
 .filter-bar {
-  margin-top: 18px;
+  margin-top: 4px;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
 }
@@ -879,7 +976,7 @@ p {
 }
 
 .filter-chips {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -949,28 +1046,44 @@ p {
 }
 
 .airport-deep-dive {
-  padding-bottom: 24px;
+  padding-bottom: 28px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(113, 197, 255, 0.16), rgba(9, 25, 76, 0) 48%),
+    linear-gradient(180deg, rgba(18, 42, 116, 0.42), rgba(8, 22, 74, 0.68));
+}
+
+.airport-deep-dive .panel-header h2 {
+  font-size: clamp(1.58rem, 2.4vw, 2.05rem);
+  letter-spacing: 0.01em;
+}
+
+.airport-deep-dive .panel-header p {
+  font-size: 1.04rem;
+  color: #ddeafb;
+  max-width: 62ch;
 }
 
 .airport-deep-dive-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.25fr);
-  gap: 18px;
+  gap: 20px;
   padding: 0 24px;
 }
 
 .airport-facts-card,
 .airport-restaurants-card {
-  border: 1px solid rgba(196, 217, 243, 0.34);
-  border-radius: 18px;
-  background: rgba(4, 14, 58, 0.62);
-  padding: 24px;
+  border: 1px solid rgba(174, 214, 255, 0.44);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(12, 32, 90, 0.78), rgba(7, 21, 66, 0.78));
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(188, 221, 255, 0.12);
+  padding: 26px;
 }
 
 .airport-facts-card h3,
 .airport-restaurants-card h3 {
-  margin: 0 0 14px;
-  font-size: 1.15rem;
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+  color: #f3f8ff;
   letter-spacing: 0.01em;
 }
 
@@ -993,7 +1106,7 @@ p {
 .airport-facts-list span {
   display: block;
   color: rgba(198, 220, 244, 0.92);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 5px;
@@ -1002,7 +1115,8 @@ p {
 .airport-facts-list p {
   margin: 0;
   color: #e9f3ff;
-  font-size: 1rem;
+  font-size: 1.08rem;
+  font-weight: 560;
   line-height: 1.45;
 }
 
@@ -1023,14 +1137,71 @@ p {
 .airport-history-note h4,
 .airport-facts-card h4 {
   margin: 0 0 8px;
-  font-size: 0.98rem;
+  font-size: 1.08rem;
+  color: #f0f7ff;
   letter-spacing: 0.01em;
 }
 
 .airport-history-note p {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   line-height: 1.58;
+}
+
+.airport-weather-note {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(196, 217, 243, 0.22);
+  background: rgba(64, 124, 216, 0.11);
+}
+
+.airport-weather-note h4 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  letter-spacing: 0.01em;
+}
+
+#airportWeatherSummary {
+  margin: 0 0 10px;
+  color: #eaf3ff;
+  font-size: 1.16rem;
+  font-weight: 700;
+}
+
+.airport-weather-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.airport-weather-grid div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(196, 217, 243, 0.18);
+  background: linear-gradient(180deg, rgba(16, 42, 106, 0.36), rgba(7, 21, 66, 0.52));
+}
+
+.airport-weather-grid span {
+  display: block;
+  color: rgba(198, 220, 244, 0.9);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.airport-weather-grid p {
+  margin: 0;
+  color: #e9f3ff;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.airport-weather-updated {
+  margin: 10px 0 0;
+  color: #c8dcf4;
+  font-size: 0.8rem;
 }
 
 .airport-highlights-section {
@@ -1049,7 +1220,7 @@ p {
   border: 1px solid rgba(196, 217, 243, 0.18);
   background: linear-gradient(180deg, rgba(16, 42, 106, 0.32), rgba(7, 21, 66, 0.56));
   color: #dbeafc;
-  font-size: 0.96rem;
+  font-size: 1.04rem;
   line-height: 1.5;
 }
 
@@ -1059,6 +1230,7 @@ p {
 
 .airport-restaurants-head p {
   margin: 0 0 12px;
+  font-size: 1rem;
 }
 
 .airport-restaurants-map {
@@ -1732,10 +1904,6 @@ p {
     margin: 0 auto;
   }
 
-  .filter-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1782,6 +1950,31 @@ p {
 }
 
 @media (max-width: 760px) {
+  .floating-brand {
+    top: 8px;
+    left: 8px;
+    padding: 5px 7px;
+  }
+
+  .floating-brand img {
+    width: min(108px, 34vw);
+  }
+
+  .filter-fab {
+    top: 10px;
+    right: 10px;
+    padding: 9px 12px;
+    font-size: 0.84rem;
+  }
+
+  .filter-popup {
+    top: 52px;
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 66px);
+    padding: 12px;
+  }
+
   .page-shell {
     width: min(100% - 24px, 1120px);
     padding: 14px 0 56px;
@@ -1826,6 +2019,10 @@ p {
   }
 
   .airport-restaurants-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .airport-weather-grid {
     grid-template-columns: 1fr;
   }
 

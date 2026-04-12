@@ -226,11 +226,14 @@ const airportSnapshotCache = new Map();
 let airportPhotoIntervalId = null;
 let airportPhotoElements = null;
 const airportRestaurantsCache = new Map();
+const airportWeatherCache = new Map();
 let airportRestaurantsMap = null;
 let airportRestaurantsMapLayer = null;
 let airportRestaurantsMapTileLayer = null;
 
 const elements = {
+  landingSection: document.getElementById("landingSection"),
+  floatingBrand: document.getElementById("floatingBrand"),
   airportSelectorButtons: document.querySelectorAll("[data-airport-code]"),
   airportChoicePrompt: document.getElementById("airportChoicePrompt"),
   refreshButton: document.getElementById("refreshButton"),
@@ -251,6 +254,14 @@ const elements = {
   airportFactOpened: document.getElementById("airportFactOpened"),
   airportFactTraffic: document.getElementById("airportFactTraffic"),
   airportHistoryText: document.getElementById("airportHistoryText"),
+  airportWeatherCard: document.getElementById("airportWeatherCard"),
+  airportWeatherSummary: document.getElementById("airportWeatherSummary"),
+  airportWeatherTemp: document.getElementById("airportWeatherTemp"),
+  airportWeatherFeelsLike: document.getElementById("airportWeatherFeelsLike"),
+  airportWeatherWind: document.getElementById("airportWeatherWind"),
+  airportWeatherHumidity: document.getElementById("airportWeatherHumidity"),
+  airportWeatherRange: document.getElementById("airportWeatherRange"),
+  airportWeatherUpdated: document.getElementById("airportWeatherUpdated"),
   airportHighlightsList: document.getElementById("airportHighlightsList"),
   airportRestaurantsMiniMap: document.getElementById("airportRestaurantsMiniMap"),
   airportRestaurantsGrid: document.getElementById("airportRestaurantsGrid"),
@@ -270,6 +281,9 @@ const elements = {
   flightConstellation: document.getElementById("flightConstellation"),
   flightTooltip: document.getElementById("flightTooltip"),
   selectedFlightPanel: document.getElementById("selectedFlightPanel"),
+  filterPopupToggle: document.getElementById("filterPopupToggle"),
+  filterPopup: document.getElementById("filterPopup"),
+  filterPopupClose: document.getElementById("filterPopupClose"),
   filterStatus: document.getElementById("filterStatus"),
   filterAirline: document.getElementById("filterAirline"),
   filterDestination: document.getElementById("filterDestination"),
@@ -280,6 +294,40 @@ const elements = {
   mapThemeToggle: document.getElementById("mapThemeToggle"),
   apiUnauthorizedFlag: document.getElementById("apiUnauthorizedFlag"),
 };
+
+function setFilterPopupOpen(isOpen) {
+  if (!elements.filterPopup || !elements.filterPopupToggle) {
+    return;
+  }
+
+  elements.filterPopup.classList.toggle("hidden", !isOpen);
+  elements.filterPopupToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+  if (isOpen) {
+    if (elements.filterAirline) {
+      elements.filterAirline.focus();
+    }
+  }
+}
+
+function toggleFilterPopup() {
+  if (!elements.filterPopup) {
+    return;
+  }
+
+  const isOpen = !elements.filterPopup.classList.contains("hidden");
+  setFilterPopupOpen(!isOpen);
+}
+
+function updateFloatingBrandVisibility() {
+  if (!elements.floatingBrand || !elements.landingSection) {
+    return;
+  }
+
+  const landingRect = elements.landingSection.getBoundingClientRect();
+  const hasScrolledPastLanding = landingRect.bottom <= 40;
+  elements.floatingBrand.classList.toggle("is-visible", hasScrolledPastLanding);
+}
 
 function normalizeAirportCode(value) {
   const code = String(value || "").trim().toUpperCase();
@@ -609,6 +657,192 @@ function toNumberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function weatherCodeLabel(code) {
+  const lookup = {
+    0: "Clear sky",
+    1: "Mostly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Light rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Light snow",
+    73: "Moderate snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Light rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Light snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with light hail",
+    99: "Thunderstorm with heavy hail",
+  };
+
+  return lookup[code] || "Current conditions unavailable";
+}
+
+function weatherCodeSymbol(code, isDaylight = true) {
+  const normalized = Number.isFinite(Number(code)) ? Number(code) : null;
+
+  if (normalized === 0) {
+    return isDaylight ? "☀️" : "🌙";
+  }
+
+  if (normalized === 1 || normalized === 2) {
+    return isDaylight ? "⛅" : "☁️";
+  }
+
+  if (normalized === 3) {
+    return "☁️";
+  }
+
+  if (normalized === 45 || normalized === 48) {
+    return "🌫️";
+  }
+
+  if ((normalized >= 51 && normalized <= 57) || (normalized >= 61 && normalized <= 67) || (normalized >= 80 && normalized <= 82)) {
+    return "🌧️";
+  }
+
+  if ((normalized >= 71 && normalized <= 77) || normalized === 85 || normalized === 86) {
+    return "❄️";
+  }
+
+  if (normalized === 95 || normalized === 96 || normalized === 99) {
+    return "⛈️";
+  }
+
+  return "🌡️";
+}
+
+function formatWeatherTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function setAirportWeatherUnavailable(message = "Current airport weather is temporarily unavailable.") {
+  if (elements.airportWeatherSummary) {
+    elements.airportWeatherSummary.textContent = `⚠️ ${message}`;
+  }
+  if (elements.airportWeatherTemp) {
+    elements.airportWeatherTemp.textContent = "—";
+  }
+  if (elements.airportWeatherFeelsLike) {
+    elements.airportWeatherFeelsLike.textContent = "—";
+  }
+  if (elements.airportWeatherWind) {
+    elements.airportWeatherWind.textContent = "—";
+  }
+  if (elements.airportWeatherHumidity) {
+    elements.airportWeatherHumidity.textContent = "—";
+  }
+  if (elements.airportWeatherRange) {
+    elements.airportWeatherRange.textContent = "—";
+  }
+  if (elements.airportWeatherUpdated) {
+    elements.airportWeatherUpdated.textContent = "Forecast update unavailable";
+  }
+}
+
+function renderAirportWeather(weather) {
+  if (!elements.airportWeatherCard) {
+    return;
+  }
+
+  if (!weather || weather.error) {
+    setAirportWeatherUnavailable();
+    return;
+  }
+
+  const current = weather.current || {};
+  const daily = weather.daily || {};
+
+  const weatherCode = toNumberOrNull(current.weather_code);
+  const isDaylight = toNumberOrNull(current.is_day) === 1;
+  const temp = toNumberOrNull(current.temperature_2m);
+  const feelsLike = toNumberOrNull(current.apparent_temperature);
+  const humidity = toNumberOrNull(current.relative_humidity_2m);
+  const windSpeed = toNumberOrNull(current.wind_speed_10m);
+  const tempMax = toNumberOrNull(daily.temperatureMax);
+  const tempMin = toNumberOrNull(daily.temperatureMin);
+
+  if (elements.airportWeatherSummary) {
+    elements.airportWeatherSummary.textContent = `${weatherCodeSymbol(weatherCode, isDaylight)} ${weatherCodeLabel(weatherCode)}`;
+  }
+  if (elements.airportWeatherTemp) {
+    elements.airportWeatherTemp.textContent = Number.isFinite(temp) ? `${Math.round(temp)}°C` : "—";
+  }
+  if (elements.airportWeatherFeelsLike) {
+    elements.airportWeatherFeelsLike.textContent = Number.isFinite(feelsLike) ? `${Math.round(feelsLike)}°C` : "—";
+  }
+  if (elements.airportWeatherWind) {
+    elements.airportWeatherWind.textContent = Number.isFinite(windSpeed) ? `${Math.round(windSpeed)} km/h` : "—";
+  }
+  if (elements.airportWeatherHumidity) {
+    elements.airportWeatherHumidity.textContent = Number.isFinite(humidity) ? `${Math.round(humidity)}%` : "—";
+  }
+  if (elements.airportWeatherRange) {
+    elements.airportWeatherRange.textContent = Number.isFinite(tempMin) && Number.isFinite(tempMax)
+      ? `${Math.round(tempMin)}°C to ${Math.round(tempMax)}°C`
+      : "—";
+  }
+  if (elements.airportWeatherUpdated) {
+    const formatted = formatWeatherTimestamp(current.time || weather.fetchedAt);
+    elements.airportWeatherUpdated.textContent = formatted
+      ? `Updated ${formatted}`
+      : "Updated just now";
+  }
+}
+
+async function getAirportWeather(airportCode) {
+  const cached = airportWeatherCache.get(airportCode);
+  const now = Date.now();
+
+  if (cached && now - cached.updatedAt <= 10 * 60 * 1000) {
+    return cached.payload;
+  }
+
+  const response = await fetch(`/api/weather?airport=${encodeURIComponent(airportCode)}`, {
+    cache: "no-store",
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload && payload.error ? payload.error : "Weather request failed");
+  }
+
+  airportWeatherCache.set(airportCode, {
+    updatedAt: now,
+    payload,
+  });
+
+  return payload;
+}
+
 function normalizeRestaurantRecord(row) {
   return {
     name: row["Business Name"] || "Unnamed restaurant",
@@ -816,7 +1050,7 @@ async function renderAirportDeepDive(airportCode) {
     elements.airportDeepDiveTitle.textContent = `${airport.title} Deep Dive`;
   }
   if (elements.airportDeepDiveSubtitle) {
-    elements.airportDeepDiveSubtitle.textContent = "Address, operations, and food highlights sourced for this airport.";
+    elements.airportDeepDiveSubtitle.textContent = "Everything you need at a glance: airport details, current weather, and dining highlights.";
   }
   if (elements.airportDeepDiveCodePill) {
     elements.airportDeepDiveCodePill.textContent = airport.code;
@@ -845,6 +1079,14 @@ async function renderAirportDeepDive(airportCode) {
       .map((item) => `<div class="airport-highlight-item">${escapeHtml(item)}</div>`)
       .join("");
   }
+
+  let weatherPayload = null;
+  try {
+    weatherPayload = await getAirportWeather(airport.code);
+  } catch (_error) {
+    weatherPayload = null;
+  }
+  renderAirportWeather(weatherPayload);
 
   const restaurants = await getAirportRestaurants(airport.code);
   renderRestaurantCards(restaurants);
@@ -3019,6 +3261,55 @@ if (elements.clearFiltersButton) {
     updateFilteredView();
   });
 }
+
+if (elements.filterPopupToggle) {
+  elements.filterPopupToggle.addEventListener("click", () => {
+    toggleFilterPopup();
+  });
+}
+
+if (elements.filterPopupClose) {
+  elements.filterPopupClose.addEventListener("click", () => {
+    setFilterPopupOpen(false);
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !elements.filterPopup) {
+    return;
+  }
+
+  const isOpen = !elements.filterPopup.classList.contains("hidden");
+  if (isOpen) {
+    setFilterPopupOpen(false);
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!elements.filterPopup || !elements.filterPopupToggle) {
+    return;
+  }
+
+  const isOpen = !elements.filterPopup.classList.contains("hidden");
+  if (!isOpen) {
+    return;
+  }
+
+  const target = event.target;
+  if (!(target instanceof Node)) {
+    return;
+  }
+
+  if (elements.filterPopup.contains(target) || elements.filterPopupToggle.contains(target)) {
+    return;
+  }
+
+  setFilterPopupOpen(false);
+});
+
+window.addEventListener("scroll", updateFloatingBrandVisibility, { passive: true });
+window.addEventListener("resize", updateFloatingBrandVisibility, { passive: true });
+updateFloatingBrandVisibility();
 
 if (elements.mapThemeToggle) {
   syncMapThemeToggleUi();

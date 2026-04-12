@@ -25,6 +25,73 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="dm-sans-body">
+    <a id="floatingBrand" class="floating-brand" href="#landingSection" aria-label="Back to top">
+      <img src="img/logo.png" alt="PlaneSight logo" />
+    </a>
+
+    <button
+      id="filterPopupToggle"
+      class="button button-ghost filter-fab"
+      type="button"
+      aria-controls="filterPopup"
+      aria-expanded="false"
+      aria-label="Open search and filter panel"
+    >
+      <svg class="filter-fab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 5a1 1 0 0 1 1-1h16a1 1 0 0 1 .8 1.6L14 14.5V20a1 1 0 0 1-1.45.89l-3-1.5A1 1 0 0 1 9 18.5v-4L3.2 5.6A1 1 0 0 1 3 5z"></path>
+      </svg>
+      <span>Search/Filter</span>
+    </button>
+
+    <aside id="filterPopup" class="filter-popup hidden" role="dialog" aria-modal="false" aria-label="Search and filter flights">
+      <div class="filter-popup-header">
+        <h3>Search and Filter Flights</h3>
+        <button id="filterPopupClose" class="button button-ghost filter-popup-close" type="button" aria-label="Close search and filter panel">Close</button>
+      </div>
+
+      <section class="filter-bar" aria-label="Flight filters">
+        <label>
+          Status
+          <select id="filterStatus">
+            <option value="all">All</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="active">Active</option>
+            <option value="landed">Landed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="incident">Incident</option>
+            <option value="diverted">Diverted</option>
+            <option value="live">Live only</option>
+          </select>
+        </label>
+
+        <label>
+          Airline
+          <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
+        </label>
+
+        <label>
+          Destination
+          <input id="filterDestination" type="text" placeholder="e.g. Vancouver or YVR" />
+        </label>
+
+        <label>
+          Max flights shown
+          <select id="filterLimit">
+            <option value="all">All</option>
+            <option value="100">100</option>
+            <option value="60">60</option>
+            <option value="40">40</option>
+            <option value="20">20</option>
+          </select>
+        </label>
+
+        <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
+        <button id="loadAllOnceButton" class="button button-ghost" type="button">Load all once</button>
+      </section>
+
+      <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
+    </aside>
+
     <div class="refresh-floating">
       <button id="refreshButton" class="button" type="button">Refresh</button>
       <p id="lastUpdatedText">Waiting for first refresh</p>
@@ -192,7 +259,7 @@
         <div class="panel-header">
           <div>
             <h2 id="airportDeepDiveTitle">Airport Deep Dive</h2>
-            <p id="airportDeepDiveSubtitle">Address, operational facts, and local highlights for the selected airport.</p>
+            <p id="airportDeepDiveSubtitle">Everything you need at a glance: airport details, current weather, and dining highlights.</p>
           </div>
           <span id="airportDeepDiveCodePill" class="panel-pill">YYZ</span>
         </div>
@@ -228,6 +295,34 @@
               <p id="airportHistoryText">—</p>
             </div>
 
+            <div id="airportWeatherCard" class="airport-weather-note">
+              <h4>Current Weather</h4>
+              <p id="airportWeatherSummary">Loading latest airport forecast...</p>
+              <div class="airport-weather-grid">
+                <div>
+                  <span>🌡️ Temperature</span>
+                  <p id="airportWeatherTemp">—</p>
+                </div>
+                <div>
+                  <span>🧣 Feels Like</span>
+                  <p id="airportWeatherFeelsLike">—</p>
+                </div>
+                <div>
+                  <span>💨 Wind</span>
+                  <p id="airportWeatherWind">—</p>
+                </div>
+                <div>
+                  <span>💧 Humidity</span>
+                  <p id="airportWeatherHumidity">—</p>
+                </div>
+                <div>
+                  <span>📈 Today's Range</span>
+                  <p id="airportWeatherRange">—</p>
+                </div>
+              </div>
+              <p id="airportWeatherUpdated" class="airport-weather-updated">—</p>
+            </div>
+
             <div class="airport-highlights-section">
               <h4>Quick Highlights</h4>
               <div id="airportHighlightsList" class="airport-highlights-list"></div>
@@ -237,7 +332,7 @@
           <article class="airport-restaurants-card">
             <div class="airport-restaurants-head">
               <h3>Featured Restaurants</h3>
-              <p>Picked from your airport CSV source data.</p>
+              <p>Popular spots to eat around the terminal area.</p>
             </div>
 
             <div id="airportRestaurantsMiniMap" class="airport-restaurants-map" aria-label="Restaurant map"></div>
@@ -257,58 +352,6 @@
       </section> -->
 
       <section id="visualsSection" class="reveal-section visuals-stack">
-        <section class="panel chart-placeholder visuals-intro">
-          <div class="panel-header">
-            <div>
-              <h2>Traffic visualizations</h2>
-              <p>Top routes, hourly clock view, and a live artistic flight map.</p>
-            </div>
-            <span class="panel-pill">Live visuals</span>
-          </div>
-
-          <section class="filter-bar" aria-label="Flight filters">
-            <label>
-              Status
-              <select id="filterStatus">
-                <option value="all">All</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="active">Active</option>
-                <option value="landed">Landed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="incident">Incident</option>
-                <option value="diverted">Diverted</option>
-                <option value="live">Live only</option>
-              </select>
-            </label>
-
-            <label>
-              Airline
-              <input id="filterAirline" type="text" placeholder="e.g. Air Canada" />
-            </label>
-
-            <label>
-              Destination
-              <input id="filterDestination" type="text" placeholder="e.g. Vancouver or YVR" />
-            </label>
-
-            <label>
-              Max flights shown
-              <select id="filterLimit">
-                <option value="all">All</option>
-                <option value="100">100</option>
-                <option value="60">60</option>
-                <option value="40">40</option>
-                <option value="20">20</option>
-              </select>
-            </label>
-
-            <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
-            <button id="loadAllOnceButton" class="button button-ghost" type="button">Load all once</button>
-          </section>
-
-          <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
-        </section>
-
         <div id="dataVisualizationsSection" class="viz-grid">
           <section id="topRoutesSection" class="viz-card top-summary-card">
             <div class="top-summary-grid">
