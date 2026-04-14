@@ -230,6 +230,8 @@ const airportWeatherCache = new Map();
 let airportRestaurantsMap = null;
 let airportRestaurantsMapLayer = null;
 let airportRestaurantsMapTileLayer = null;
+const airportRestaurantMarkersByKey = new Map();
+let selectedAirportRestaurantKey = null;
 
 const elements = {
   landingSection: document.getElementById("landingSection"),
@@ -891,14 +893,86 @@ async function getAirportRestaurants(airportCode) {
   }
 }
 
-function renderRestaurantCards(restaurants) {
+function getAirportRestaurantKey(restaurant) {
+  const lat = Number.isFinite(restaurant.latitude) ? restaurant.latitude.toFixed(5) : "na";
+  const lon = Number.isFinite(restaurant.longitude) ? restaurant.longitude.toFixed(5) : "na";
+  return [
+    String(restaurant.name || "").trim().toLowerCase(),
+    String(restaurant.address || "").trim().toLowerCase(),
+    lat,
+    lon,
+  ].join("|");
+}
+
+function getRestaurantCardImage(airportCode, restaurant) {
+  const normalizedAirportCode = normalizeAirportCode(airportCode);
+  const restaurantName = String(restaurant.name || "").trim().toLowerCase();
+
+  if (normalizedAirportCode === "YYZ" && restaurantName.includes("chop")) {
+    return {
+      src: "img/Chop.png",
+      alt: `${String(restaurant.name || "CHOP Steakhouse")} interior`,
+    };
+  }
+
+  return null;
+}
+
+function syncAirportRestaurantSelection({ focusMap = false, focusCard = false } = {}) {
+  if (elements.airportRestaurantsGrid) {
+    const cards = elements.airportRestaurantsGrid.querySelectorAll(".airport-restaurant-card");
+    cards.forEach((card) => {
+      const isSelected = !!selectedAirportRestaurantKey && card.dataset.restaurantKey === selectedAirportRestaurantKey;
+      card.classList.toggle("is-selected", isSelected);
+      card.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
+  }
+
+  airportRestaurantMarkersByKey.forEach(({ marker }, key) => {
+    const isSelected = !!selectedAirportRestaurantKey && key === selectedAirportRestaurantKey;
+    marker.setStyle({
+      radius: isSelected ? 9 : 6,
+      color: isSelected ? "#ffffff" : "rgba(255,255,255,0.88)",
+      weight: isSelected ? 2 : 1.2,
+      fillColor: isSelected ? "#9fe6ff" : "#56ccf2",
+      fillOpacity: isSelected ? 1 : 0.84,
+    });
+
+    if (!selectedAirportRestaurantKey) {
+      marker.closePopup();
+    }
+  });
+
+  if (selectedAirportRestaurantKey && focusMap && airportRestaurantsMap) {
+    const selected = airportRestaurantMarkersByKey.get(selectedAirportRestaurantKey);
+    if (selected && Number.isFinite(selected.restaurant.latitude) && Number.isFinite(selected.restaurant.longitude)) {
+      airportRestaurantsMap.panTo([selected.restaurant.latitude, selected.restaurant.longitude], {
+        animate: true,
+        duration: 0.35,
+      });
+      selected.marker.openPopup();
+    }
+  }
+
+  if (selectedAirportRestaurantKey && focusCard && elements.airportRestaurantsGrid) {
+    const selectedCard = elements.airportRestaurantsGrid.querySelector(
+      `.airport-restaurant-card[data-restaurant-key="${selectedAirportRestaurantKey}"]`,
+    );
+    if (selectedCard) {
+      selectedCard.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    }
+  }
+}
+
+function renderRestaurantCards(restaurants, airportCode = activeAirportCode) {
   if (!elements.airportRestaurantsGrid) {
-    return;
+    return [];
   }
 
   if (!restaurants.length) {
     elements.airportRestaurantsGrid.innerHTML = '<p class="airport-restaurants-empty">No restaurant data available for this airport yet.</p>';
-    return;
+    selectedAirportRestaurantKey = null;
+    return [];
   }
 
   const featured = [...restaurants]
@@ -925,11 +999,16 @@ function renderRestaurantCards(restaurants) {
       const mapsLink = restaurant.mapsUrl
         ? `<a href="${escapeHtml(restaurant.mapsUrl)}" target="_blank" rel="noopener noreferrer">Google Maps</a>`
         : "";
+      const restaurantKey = getAirportRestaurantKey(restaurant);
+      const cardImage = getRestaurantCardImage(airportCode, restaurant);
+      const imageMarkup = cardImage
+        ? `<img class="restaurant-card-image" src="${escapeHtml(cardImage.src)}" alt="${escapeHtml(cardImage.alt)}" loading="lazy" />`
+        : "<div class=\"restaurant-image-placeholder\">Image Slot</div>";
 
       return `
-        <article class="airport-restaurant-card">
+        <article class="airport-restaurant-card" data-restaurant-key="${escapeHtml(restaurantKey)}" role="button" tabindex="0" aria-pressed="false">
           <div class="restaurant-preview">
-            <div class="restaurant-image-placeholder">Image Slot</div>
+            ${imageMarkup}
             <div class="restaurant-preview-footer">
               <h4>${escapeHtml(restaurant.name)}</h4>
               <div class="restaurant-meta">
@@ -938,6 +1017,7 @@ function renderRestaurantCards(restaurants) {
               </div>
             </div>
             <div class="restaurant-detail-overlay">
+              <h4 class="restaurant-overlay-title">${escapeHtml(restaurant.name)}</h4>
               <div class="restaurant-meta">
                 <span>${escapeHtml(restaurant.category)}</span>
                 <span>${escapeHtml(ratingText)}</span>
@@ -957,6 +1037,28 @@ function renderRestaurantCards(restaurants) {
       `;
     })
     .join("");
+
+  const cardElements = elements.airportRestaurantsGrid.querySelectorAll(".airport-restaurant-card");
+  cardElements.forEach((card) => {
+    const selectCard = () => {
+      const clickedKey = card.dataset.restaurantKey || null;
+      selectedAirportRestaurantKey = selectedAirportRestaurantKey === clickedKey
+        ? null
+        : clickedKey;
+      syncAirportRestaurantSelection({ focusMap: true, focusCard: false });
+    };
+
+    card.addEventListener("click", selectCard);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectCard();
+      }
+    });
+  });
+
+  syncAirportRestaurantSelection();
+  return featured;
 }
 
 function ensureAirportRestaurantsMap() {
@@ -1006,6 +1108,11 @@ function renderAirportRestaurantsMap(restaurants) {
 
   syncAirportRestaurantsMapTheme();
   airportRestaurantsMapLayer.clearLayers();
+  airportRestaurantMarkersByKey.clear();
+
+  if (!restaurants.length) {
+    selectedAirportRestaurantKey = null;
+  }
 
   const boundsPoints = [];
 
@@ -1028,6 +1135,15 @@ function renderAirportRestaurantsMap(restaurants) {
       Rating: ${escapeHtml(Number.isFinite(restaurant.rating) ? `★ ${restaurant.rating.toFixed(1)}` : "n/a")}
     `);
 
+    const restaurantKey = getAirportRestaurantKey(restaurant);
+    airportRestaurantMarkersByKey.set(restaurantKey, { marker, restaurant });
+    marker.on("click", () => {
+      selectedAirportRestaurantKey = selectedAirportRestaurantKey === restaurantKey
+        ? null
+        : restaurantKey;
+      syncAirportRestaurantSelection({ focusMap: false, focusCard: true });
+    });
+
     marker.addTo(airportRestaurantsMapLayer);
     boundsPoints.push([restaurant.latitude, restaurant.longitude]);
   });
@@ -1040,6 +1156,12 @@ function renderAirportRestaurantsMap(restaurants) {
   } else {
     airportRestaurantsMap.setView([20, 0], 2);
   }
+
+  if (selectedAirportRestaurantKey && !airportRestaurantMarkersByKey.has(selectedAirportRestaurantKey)) {
+    selectedAirportRestaurantKey = null;
+  }
+
+  syncAirportRestaurantSelection();
 }
 
 async function renderAirportDeepDive(airportCode) {
@@ -1089,8 +1211,8 @@ async function renderAirportDeepDive(airportCode) {
   renderAirportWeather(weatherPayload);
 
   const restaurants = await getAirportRestaurants(airport.code);
-  renderRestaurantCards(restaurants);
-  renderAirportRestaurantsMap(restaurants);
+  const featuredRestaurants = renderRestaurantCards(restaurants, airport.code);
+  renderAirportRestaurantsMap(featuredRestaurants);
 }
 
 function applyAirportSnapshot(snapshot) {
@@ -1252,17 +1374,10 @@ function initRevealSectionsAndNavWheel() {
     }
   }
 
-  if (!navItems.length) {
-    return;
-  }
-
   const sectionElements = navItems
     .map((item) => document.getElementById(item.dataset.target || ""))
     .filter(Boolean);
-
-  if (!sectionElements.length) {
-    return;
-  }
+  const hasSectionNav = navItems.length > 0 && sectionElements.length > 0;
 
   function setActiveIndex(index, { scroll = false } = {}) {
     const clampedIndex = Math.max(0, Math.min(sectionElements.length - 1, index));
@@ -1279,22 +1394,25 @@ function initRevealSectionsAndNavWheel() {
     }
   }
 
-  navItems.forEach((item) => {
-    if (!item.dataset.label) {
-      item.dataset.label = (item.textContent || "").trim();
-    }
-
-    item.addEventListener("click", () => {
-      const itemIndex = navItems.indexOf(item);
-      if (itemIndex < 0) {
-        return;
+  if (hasSectionNav) {
+    navItems.forEach((item) => {
+      if (!item.dataset.label) {
+        item.dataset.label = (item.textContent || "").trim();
       }
 
-      setActiveIndex(itemIndex, { scroll: true });
+      item.addEventListener("click", () => {
+        const itemIndex = navItems.indexOf(item);
+        if (itemIndex < 0) {
+          return;
+        }
+
+        setActiveIndex(itemIndex, { scroll: true });
+      });
     });
-  });
+  }
 
   let ticking = false;
+  let lastScrollTop = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
 
   function scheduleNavSync() {
     if (ticking) {
@@ -1303,14 +1421,20 @@ function initRevealSectionsAndNavWheel() {
 
     ticking = true;
     window.requestAnimationFrame(() => {
-      updateNavProgressAnchors();
-      updateNavWheelState();
+      if (hasSectionNav) {
+        updateNavProgressAnchors();
+        updateNavWheelState();
+      }
       updatePageProgress();
       ticking = false;
     });
   }
 
   function updateNavProgressAnchors() {
+    if (!hasSectionNav) {
+      return;
+    }
+
     const scrollMax = Math.max(
       1,
       document.documentElement.scrollHeight - window.innerHeight,
@@ -1343,6 +1467,10 @@ function initRevealSectionsAndNavWheel() {
   }
 
   function updateNavWheelState() {
+    if (!hasSectionNav) {
+      return;
+    }
+
     const defaultAnchorY = window.innerHeight * 0.28;
     let bestIndex = 0;
     let bestScore = Number.POSITIVE_INFINITY;
@@ -1370,7 +1498,7 @@ function initRevealSectionsAndNavWheel() {
       return;
     }
 
-    const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const scrollTop = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
     const scrollMax = Math.max(
       1,
       document.documentElement.scrollHeight - window.innerHeight,
@@ -1383,7 +1511,16 @@ function initRevealSectionsAndNavWheel() {
 
     if (pageProgressPlane) {
       pageProgressPlane.style.left = `${progress * 100}%`;
+
+      // Flip the plane when the user scrolls upward so orientation matches movement.
+      if (scrollTop < lastScrollTop - 1) {
+        pageProgressPlane.classList.add("is-reverse");
+      } else if (scrollTop > lastScrollTop + 1) {
+        pageProgressPlane.classList.remove("is-reverse");
+      }
     }
+
+    lastScrollTop = scrollTop;
 
     updateNavHitState(progress);
   }
@@ -1411,8 +1548,10 @@ function initRevealSectionsAndNavWheel() {
     });
   }
 
-  updateNavProgressAnchors();
-  updateNavWheelState();
+  if (hasSectionNav) {
+    updateNavProgressAnchors();
+    updateNavWheelState();
+  }
   updatePageProgress();
 }
 
