@@ -532,3 +532,96 @@ to identify and display an image of the corrosponding aircraft listed upon click
 _**User (2026-04-13 23:03:42Z)**_
 
 try this one instead https://www.kaggle.com/datasets/nelyg8002000/commercial-aircraft-dataset
+
+_**User (2026-04-13 23:41:48Z)**_
+
+I put most of the files onto this repository, will this suffice? there are many files https://github.com/saisenee/AircraftPhotos/tree/main
+
+
+---
+
+_**Agent (copilot/auto)**_
+
+I’ll quickly inspect that repository’s file/folder layout and naming so I can tell you if it matches the current image lookup flow and what (if anything) still needs to be adjusted.
+
+---
+
+_**User (2026-04-13 23:44:22Z)**_
+
+can we have it so that it matches the airline too? it seems too random right now, I want it to be accurate to the actual plane listed
+
+_**User (2026-04-13 23:51:19Z)**_
+
+Are you able to identify and display an image of the corrosponding airline aircraft listed upon clicking on a flight on the flight map? Also in that div display the airline logo and overall increase text size for readability
+
+---
+
+_**Agent (copilot/auto)**_
+
+I can do that. I’ll upgrade the selected-flight panel so it shows the airline logo, keeps the airline-aware aircraft image, and increases typography sizing for much better readability.
+
+---
+
+_**User (2026-04-13 23:55:50Z)**_
+
+Are you able to identify and display an image of the corrosponding airline aircraft listed upon clicking on a flight on the flight map?
+
+---
+
+_**Agent (copilot/auto)**_
+
+Yes, I can add that. I’m going to hook into the existing “selected flight” panel flow and append an aircraft image block that updates whenever a map flight is clicked.
+
+---
+
+_**User (2026-04-14 00:02:23Z)**_
+
+images arent loading, can yo find a resource online that can provide matching images at the bare minimum the same airline as what is selected? ideally it would be great if it was the exact aircraft
+
+_**User (2026-04-14 00:28:43Z)**_
+
+Please increase the text size in the flight map selected flight div, I want things to be big and visual, update all text on the page to be large and easy to parse on smaller screens. 
+
+---
+
+_**Agent (copilot/auto)**_
+
+I’ll do a typography pass focused on readability on small screens: bump global mobile text scale and specifically enlarge the Selected flight panel content in the flight map.
+
+---
+
+_**User (2026-04-14 00:40:50Z)**_
+
+for the nav bar, can you make it so that the plane icon rotates smoothly 180 degrees when scrolling up and vice versa back to normal when scrolling down? so that the plane is following the movement more accurately
+
+_**User (2026-04-14 00:45:17Z)**_
+
+can you make it so that the plane icon also is flipped vertically to ensure that it is not upside down when going to the left when scrolling up. essentially the going up page state should be a horizontal flip of the going down state
+
+_**User (2026-04-14 00:47:13Z)**_
+
+make the leaflet map for the restaurants bigger so that column fits the length of the left side in the airport info
+
+---
+
+_**Agent (copilot/auto)**_
+
+I’ll resize the restaurants Leaflet panel so it stretches to match the left airport-info column height/length, then verify the layout on the live 
+
+---
+
+_**User (2026-04-14 00:50:36Z)**_
+
+please make it so that clicking on the restaurant highlights it on the leaflet map and also vice versa, clicking on a restaurant on the leaflet map highlights the restaurant
+
+_**User (2026-04-14 00:53:24Z)**_
+
+make it so that clicking it again cancels the selection
+
+_**User (2026-04-14 01:00:42Z)**_
+
+connect chop.png to the chop steakhouse image placeholder for pearson
+
+_**User (2026-04-14 01:03:13Z)**_
+
+can you make it so that the hover for the restaurant cards includes the title text too
