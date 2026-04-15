@@ -56,11 +56,7 @@
             <option value="all">All</option>
             <option value="scheduled">Scheduled</option>
             <option value="active">Active</option>
-            <option value="landed">Landed</option>
             <option value="cancelled">Cancelled</option>
-            <option value="incident">Incident</option>
-            <option value="diverted">Diverted</option>
-            <option value="live">Live only</option>
           </select>
         </label>
 
@@ -85,8 +81,8 @@
           </select>
         </label>
 
-        <button id="clearFiltersButton" class="button button-ghost" type="button">Clear filters</button>
-        <button id="loadAllOnceButton" class="button button-ghost" type="button">Load all once</button>
+        <button id="clearFiltersButton" class="button button-ghost button-danger" type="button">Clear filters</button>
+        <button id="doneFiltersButton" class="button button-primary" type="button">Done</button>
       </section>
 
       <div id="activeFilterChips" class="filter-chips hidden" aria-live="polite"></div>
@@ -255,6 +251,24 @@
         </article>
       </section>
 
+            <section id="visualsSection" class="reveal-section visuals-stack">
+        <div id="dataVisualizationsSection" class="viz-grid">
+          <section id="topRoutesSection" class="viz-card top-summary-card">
+            <div class="top-summary-grid">
+              <article class="top-summary-panel">
+                <h3>Most Flown Routes Today</h3>
+                <p>Top three origin and destination pairs from the live feed.</p>
+                <ol id="topRoutesList" class="top-ranked-list"></ol>
+              </article>
+
+              <article class="top-summary-panel">
+                <h3>Most Flown Airlines Today</h3>
+                <p>Top three airlines by current live flight count.</p>
+                <ol id="topAirlinesList" class="top-ranked-list"></ol>
+              </article>
+            </div>
+          </section>
+          
       <section id="airportDeepDiveSection" class="panel airport-deep-dive reveal-section">
         <div class="panel-header">
           <div>
@@ -351,23 +365,7 @@
         </p>
       </section> -->
 
-      <section id="visualsSection" class="reveal-section visuals-stack">
-        <div id="dataVisualizationsSection" class="viz-grid">
-          <section id="topRoutesSection" class="viz-card top-summary-card">
-            <div class="top-summary-grid">
-              <article class="top-summary-panel">
-                <h3>Most Flown Routes Today</h3>
-                <p>Top three origin and destination pairs from the live feed.</p>
-                <ol id="topRoutesList" class="top-ranked-list"></ol>
-              </article>
 
-              <article class="top-summary-panel">
-                <h3>Most Flown Airlines Today</h3>
-                <p>Top three airlines by current live flight count.</p>
-                <ol id="topAirlinesList" class="top-ranked-list"></ol>
-              </article>
-            </div>
-          </section>
 
           <section id="hourlyClockSection" class="viz-card">
             <h3>24-Hour Flight Clock</h3>
@@ -399,6 +397,11 @@
               <div class="route-legend" aria-label="Route direction legend">
                 <span><i class="route-sample route-sample-arrival"></i>To YYZ (arrivals)</span>
                 <span><i class="route-sample route-sample-departure"></i>From YYZ (departures)</span>
+              </div>
+              <div class="status-legend" aria-label="Flight status legend">
+                <span><i class="status-dot status-dot-scheduled"></i>Scheduled</span>
+                <span><i class="status-dot status-dot-active"></i>Active</span>
+                <span><i class="status-dot status-dot-cancelled"></i>Cancelled</span>
               </div>
             </div>
           </div>

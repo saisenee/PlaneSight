@@ -291,7 +291,7 @@ const elements = {
   filterDestination: document.getElementById("filterDestination"),
   filterLimit: document.getElementById("filterLimit"),
   clearFiltersButton: document.getElementById("clearFiltersButton"),
-  loadAllOnceButton: document.getElementById("loadAllOnceButton"),
+  doneFiltersButton: document.getElementById("doneFiltersButton"),
   activeFilterChips: document.getElementById("activeFilterChips"),
   mapThemeToggle: document.getElementById("mapThemeToggle"),
   apiUnauthorizedFlag: document.getElementById("apiUnauthorizedFlag"),
@@ -1816,6 +1816,10 @@ function createOrUpdateDomesticMixChart(flights) {
     return;
   }
 
+  // Determine domestic country based on selected airport
+  const domesticCountry = activeAirportCode === "CLT" ? "US" : "CA";
+  const domesticLabel = activeAirportCode === "CLT" ? "Domestic (USA)" : "Domestic (Canada)";
+
   let domestic = 0;
   let international = 0;
 
@@ -1828,7 +1832,7 @@ function createOrUpdateDomesticMixChart(flights) {
       continue;
     }
 
-    if (peerCountry === "CA") {
+    if (peerCountry === domesticCountry) {
       domestic += 1;
     } else {
       international += 1;
@@ -1836,7 +1840,7 @@ function createOrUpdateDomesticMixChart(flights) {
   }
 
   const totalKnown = domestic + international;
-  const labels = ["Domestic (Canada)", "International"];
+  const labels = [domesticLabel, "International"];
   const values = totalKnown ? [domestic, international] : [1, 0];
   const dataset = {
     data: values,
@@ -3244,11 +3248,6 @@ async function loadAllFlightsOnce() {
   isLoadingAll = true;
   elements.refreshButton.disabled = true;
 
-  if (elements.loadAllOnceButton) {
-    elements.loadAllOnceButton.disabled = true;
-    elements.loadAllOnceButton.textContent = "Loading all…";
-  }
-
   try {
     const snapshot = await loadAirportSnapshot(requestedAirportCode, { loadAllOnce: true });
     cacheAirportSnapshot(snapshot);
@@ -3271,11 +3270,6 @@ async function loadAllFlightsOnce() {
   } finally {
     isLoadingAll = false;
     elements.refreshButton.disabled = false;
-
-    if (elements.loadAllOnceButton) {
-      elements.loadAllOnceButton.disabled = false;
-      elements.loadAllOnceButton.textContent = "Load all once";
-    }
   }
 }
 
@@ -3360,9 +3354,9 @@ elements.airportSelectorButtons.forEach((button) => {
   });
 });
 
-if (elements.loadAllOnceButton) {
-  elements.loadAllOnceButton.addEventListener("click", () => {
-    loadAllFlightsOnce();
+if (elements.doneFiltersButton) {
+  elements.doneFiltersButton.addEventListener("click", () => {
+    setFilterPopupOpen(false);
   });
 }
 
